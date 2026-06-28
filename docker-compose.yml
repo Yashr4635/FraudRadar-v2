@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  fraudradar:
+    build: .
+    container_name: fraudradar
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    env_file:
+      - .env

@@ -9,3 +9,4 @@ geoalchemy2>=0.18
 pillow
 pytesseract
 pyzbar
+python-dotenv
