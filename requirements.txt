@@ -1,5 +1,4 @@
-
-reflex[db]==0.9.5.post2
+reflex[db]==0.9.6.post1
 reflex-enterprise
 groq
 aiosqlite>=0.21.0
