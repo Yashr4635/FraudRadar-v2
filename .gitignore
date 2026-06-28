@@ -1,0 +1,38 @@
+*.py[cod]
+.states
+*.db
+.web
+assets/external/
+__pycache__/
+.web/
+.states/
+.pytest_cache/
+.git/
+.venv/
+node_modules/
+/app/__pycache__/
+
+# Environment
+.env
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Reflex
+.web/
+
+# macOS
+.DS_Store
+
+# Uploaded files
+uploaded_files/
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+
+# IDE
+.vscode/

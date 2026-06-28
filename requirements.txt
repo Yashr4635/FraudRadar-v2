@@ -1,0 +1,11 @@
+
+reflex[db]==0.9.5.post2
+reflex-enterprise
+groq
+aiosqlite>=0.21.0
+supabase
+psycopg[binary]>=3.1.8
+geoalchemy2>=0.18
+pillow
+pytesseract
+pyzbar
