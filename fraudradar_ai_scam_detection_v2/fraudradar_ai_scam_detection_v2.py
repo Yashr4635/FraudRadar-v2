@@ -22,15 +22,19 @@ def index() -> rx.Component:
 app = rx.App(
     stylesheets=["/landing_animation.css", "/dashboard_animation.css"],
     head_components=[
-        rx.el.link(rel="preconnect", href="https://fonts.googleapis.com"),
-        rx.el.link(
-            rel="preconnect", href="https://fonts.gstatic.com", cross_origin=""
-        ),
-        rx.el.link(
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
-            rel="stylesheet",
-        ),
-    ],
+    rx.el.link(rel="icon", href="/favicon.png", type="image/png"),
+
+    rx.el.link(rel="preconnect", href="https://fonts.googleapis.com"),
+    rx.el.link(
+        rel="preconnect",
+        href="https://fonts.gstatic.com",
+        cross_origin="",
+    ),
+    rx.el.link(
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        rel="stylesheet",
+    ),
+],
     theme=rx.theme(appearance="light"),
 )
 app.add_page(index, route="/")
