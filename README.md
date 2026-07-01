@@ -197,3 +197,80 @@ Supported features:
 - Secure Login
 - Session Management
 - Protected Dashboard
+
+
+
+# 📁 Project Structure
+
+```
+FraudRadar_v2/
+│
+├── assets/
+├── screenshots/
+├── fraudradar_ai_scam_detection_v2/
+│   ├── components/
+│   ├── states/
+│   └── ...
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── rxconfig.py
+└── README.md
+```
+
+---
+
+# 🧠 Challenges Solved
+
+During development, several real-world engineering challenges were addressed:
+
+- Integrated Supabase Authentication
+- Debugged Google OAuth callback issues
+- Configured Railway environment variables
+- Dockerized the application
+- Connected Groq AI API
+- Implemented OCR using Tesseract
+- Built a responsive dashboard
+- Fixed deployment and production issues
+
+---
+
+# 🚀 Future Improvements
+
+- Browser Extension
+- Android Application
+- iOS Application
+- Admin Dashboard
+- Community Scam Reporting
+- Multi-language Support
+- AI Threat Intelligence
+- Advanced ML Fraud Detection
+
+---
+
+# 👨‍💻 Author
+
+**Yash R**
+
+B.Tech Computer Science & Data Science
+
+- AI
+- Full Stack Development
+- Data Science
+- Cybersecurity
+
+GitHub:
+
+https://github.com/Yashr4635
+
+LinkedIn:
+
+(Add your LinkedIn URL)
+
+---
+
+# ⭐ Support
+
+If you found this project interesting, consider giving it a ⭐ on GitHub.
+
+Your support motivates future development.
