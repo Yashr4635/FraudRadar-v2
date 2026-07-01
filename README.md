@@ -250,7 +250,7 @@ During development, several real-world engineering challenges were addressed:
 
 # 👨‍💻 Author
 
-**Yash R**
+**DS Yashaswi **
 
 B.Tech Computer Science & Data Science
 
@@ -265,7 +265,7 @@ https://github.com/Yashr4635
 
 LinkedIn:
 
-(Add your LinkedIn URL)
+
 
 ---
 
