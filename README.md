@@ -76,3 +76,26 @@ The project is built using Python, Reflex, Supabase, Docker and Railway with a m
 | OCR | Tesseract OCR, Pyzbar |
 | Deployment | Docker, Railway |
 | Version Control | Git, GitHub |
+
+
+
+# 🏗 Architecture
+
+```text
+                User
+                  │
+                  ▼
+        FraudRadar AI Website
+                  │
+                  ▼
+         Reflex Frontend (Python)
+                  │
+                  ▼
+          Reflex Backend Server
+             │             │
+             ▼             ▼
+        Groq AI API    Supabase Auth
+                            │
+                            ▼
+                      PostgreSQL Database
+```
