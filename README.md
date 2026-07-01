@@ -99,3 +99,101 @@ The project is built using Python, Reflex, Supabase, Docker and Railway with a m
                             ▼
                       PostgreSQL Database
 ```
+
+
+# ⚙️ Installation
+
+Clone the repository
+
+```bash
+git clone https://github.com/Yashr4635/FraudRadar-v2.git
+```
+
+Move into the project
+
+```bash
+cd FraudRadar_v2
+```
+
+Create a virtual environment
+
+```bash
+python -m venv .venv
+```
+
+Activate it
+
+### macOS/Linux
+
+```bash
+source .venv/bin/activate
+```
+
+### Windows
+
+```bash
+.venv\Scripts\activate
+```
+
+Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the application
+
+```bash
+reflex run
+```
+
+---
+
+# 🐳 Docker
+
+Build
+
+```bash
+docker compose build
+```
+
+Run
+
+```bash
+docker compose up
+```
+
+---
+
+# ☁️ Deployment
+
+FraudRadar AI is deployed using **Railway** and containerized with **Docker**.
+
+Deployment workflow:
+
+```
+GitHub
+    │
+    ▼
+Docker Image
+    │
+    ▼
+Railway
+    │
+    ▼
+Live Application
+```
+
+---
+
+# 🔐 Authentication
+
+Authentication is powered by **Supabase Authentication**.
+
+
+Supported features:
+
+- Email Registration
+- Secure Login
+- Session Management
+- Protected Dashboard
