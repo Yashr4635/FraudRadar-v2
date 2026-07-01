@@ -22,7 +22,7 @@ def index() -> rx.Component:
 app = rx.App(
     stylesheets=["/landing_animation.css", "/dashboard_animation.css"],
     head_components=[
-    rx.el.link(rel="icon", href="/favicon.png", type="image/png"),
+    rx.el.link(rel="icon", href="/favicon.ico", type="image/x-icon"),
 
     rx.el.link(rel="preconnect", href="https://fonts.googleapis.com"),
     rx.el.link(
