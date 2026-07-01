@@ -65,3 +65,36 @@ The project is built using Python, Reflex, Supabase, Docker and Railway with a m
 - ☁ Cloud Deployment
 
 ---
+# 📸 Application Preview
+
+## 🏠 Landing Page
+
+<p align="center">
+<img src="screenshots/landing.png" width="900">
+</p>
+
+---
+
+## 🔐 Login
+
+<p align="center">
+<img src="screenshots/login.png" width="900">
+</p>
+
+---
+
+## 📊 Dashboard
+
+<p align="center">
+<img src="screenshots/dashboard.png" width="900">
+</p>
+
+---
+
+## 🤖 AI Assistant
+
+<p align="center">
+<img src="screenshots/assistant.png" width="900">
+</p>
+
+---
