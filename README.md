@@ -1,7 +1,7 @@
 # 🛡️ FraudRadar AI
 
 <p align="center">
-  <img src="assets/favicon.ico" width="120" alt="FraudRadar Logo"/>
+ 
 </p>
 
 <h2 align="center">
