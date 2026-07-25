@@ -1245,7 +1245,7 @@ def _assistant_quick_chip(icon: str, label: str, prompt: str) -> rx.Component:
     return rx.el.button(
         rx.icon(icon, class_name="h-3.5 w-3.5"),
         rx.el.span(label, class_name="text-xs font-semibold"),
-        on_click=lambda: AssistantState.use_prompt(prompt),
+        on_click=lambda: rx.set_value("chat-input", prompt),
         class_name="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-orange-300 hover:bg-orange-50 hover:text-[#E8471A] transition-colors",
     )
 
@@ -1324,9 +1324,10 @@ def _assistant_context_card() -> rx.Component:
                 rx.el.span(
                     "Ask AI about this scan", class_name="text-[11px] font-bold"
                 ),
-                on_click=lambda: AssistantState.use_prompt(
+                on_click=lambda: rx.set_value(
+                    "chat-input",
                     "Explain this scan result in simple terms and tell me what to do next: "
-                    + ScanState.summary
+                    + ScanState.summary,
                 ),
                 class_name="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg bg-[#E8471A] text-white hover:bg-[#c43a13]",
             ),
@@ -1441,9 +1442,7 @@ def assistant_content() -> rx.Component:
                                             p,
                                             class_name="text-sm text-gray-700 text-left",
                                         ),
-                                        on_click=lambda: (
-                                            AssistantState.use_prompt(p)
-                                        ),
+                                        on_click=lambda: rx.set_value("chat-input", p),
                                         class_name="flex items-start gap-2 p-3 rounded-xl border border-gray-200 bg-white hover:border-[#E8471A] hover:bg-orange-50 transition-colors text-left w-full",
                                     ),
                                 ),
@@ -1511,38 +1510,41 @@ def assistant_content() -> rx.Component:
                             ),
                             rx.fragment(),
                         ),
+                        id="chat-messages",
                         class_name="space-y-3 max-h-[55vh] overflow-y-auto pr-1",
                     ),
                 ),
                 class_name="bg-white border border-gray-200 rounded-2xl p-5",
             ),
-            rx.el.div(
+            rx.el.form(
                 rx.el.div(
                     rx.icon(
                         "message-circle",
                         class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400",
                     ),
                     rx.el.input(
+                        id="chat-input",
+                        name="message",
                         placeholder="Ask about a suspicious message, link, or scam...",
-                        value=AssistantState.current_input,
-                        on_change=AssistantState.set_input,
-                        on_key_down=lambda e: rx.cond(e == "Enter", AssistantState.send_message, rx.console_log("")),
+                        auto_complete="off",
                         class_name="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A] focus:border-transparent",
                     ),
                     class_name="relative flex-1",
                 ),
                 rx.el.button(
                     rx.icon("send", class_name="h-4 w-4"),
-                    on_click=AssistantState.send_message,
+                    type="submit",
                     disabled=AssistantState.is_thinking,
                     class_name="px-4 py-3 rounded-xl bg-[#E8471A] text-white hover:bg-[#c43a13] disabled:opacity-50 transition-colors",
                 ),
                 rx.el.button(
                     rx.icon("refresh-cw", class_name="h-4 w-4"),
+                    type="button",
                     on_click=AssistantState.clear_chat,
                     title="Clear chat",
                     class_name="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors",
                 ),
+                on_submit=AssistantState.send_message,
                 class_name="flex items-center gap-2 mt-3",
             ),
             rx.el.div(
@@ -2059,7 +2061,6 @@ def profile_content() -> rx.Component:
                             ),
                             class_name="flex items-center gap-2 py-1.5",
                         ),
-
                         class_name="divide-y divide-gray-100",
                     ),
                     class_name="mt-4",

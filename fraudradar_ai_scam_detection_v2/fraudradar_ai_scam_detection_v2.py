@@ -1,5 +1,9 @@
 import reflex as rx
-from fraudradar_ai_scam_detection_v2.components.auth_pages import login_page, signup_page
+from fraudradar_ai_scam_detection_v2.components.auth_pages import (
+    login_page,
+    signup_page,
+    reset_password_page,
+)
 from fraudradar_ai_scam_detection_v2.components.auth_callback import auth_callback_page
 from fraudradar_ai_scam_detection_v2.components.landing import landing_page
 from fraudradar_ai_scam_detection_v2.components.pages import (
@@ -43,7 +47,12 @@ app.add_page(
     route="/login",
     title="FraudRadar | Login",
 )
-app.add_page(signup_page, route="/signup")
+
+app.add_page(
+    reset_password_page,
+    route="/reset-password",
+    title="FraudRadar | Reset Password",
+)
 app.add_page(auth_callback_page, route="/auth/callback")
 app.add_page(dashboard_page, route="/dashboard")
 app.add_page(analyze_page, route="/analyze")

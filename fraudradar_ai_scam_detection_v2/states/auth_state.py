@@ -564,6 +564,18 @@ class AuthState(rx.State):
         # Handle implicit flow access_token
         access_token = qp.get("access_token")
         refresh_token = qp.get("refresh_token", "")
+        link_type = qp.get("type", "")
+
+        # Password recovery must never be treated as a login - route it to
+        # /reset-password, forwarding the tokens since get_supabase() creates
+        # a fresh client on every call, so no session survives server-side
+        # between this function and ResetPasswordState.
+        if access_token and link_type == "recovery":
+            from urllib.parse import quote
+            return rx.redirect(
+                f"/reset-password?access_token={quote(access_token)}"
+                f"&refresh_token={quote(refresh_token)}&type=recovery"
+            )
 
         if access_token:
             try:
@@ -625,6 +637,8 @@ class AuthState(rx.State):
                 })
                 user = result.user
                 if user:
+                    if verify_type == "recovery":
+                        return rx.redirect("/reset-password")
                     provider = self._extract_provider(user)
                     self._apply_user_session(user, result.session, provider)
                     self._sync_profile_safe()

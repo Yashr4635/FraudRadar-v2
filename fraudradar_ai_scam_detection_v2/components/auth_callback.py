@@ -11,12 +11,15 @@ def auth_callback_page() -> rx.Component:
             const params = new URLSearchParams(hash);
             const access_token = params.get("access_token");
             const refresh_token = params.get("refresh_token");
+            const type = params.get("type");
             if (access_token) {
                 window.location.href =
                     "/auth/callback?access_token=" +
                     encodeURIComponent(access_token) +
                     "&refresh_token=" +
-                    encodeURIComponent(refresh_token || "");
+                    encodeURIComponent(refresh_token || "") +
+                    "&type=" +
+                    encodeURIComponent(type || "");
             }
         })();
         """),

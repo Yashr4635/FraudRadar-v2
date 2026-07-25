@@ -1,6 +1,6 @@
 import reflex as rx
 from fraudradar_ai_scam_detection_v2.states.auth_state import AuthState
-
+from fraudradar_ai_scam_detection_v2.states.reset_password_state import ResetPasswordState
 
 def _floating_bg_accents() -> rx.Component:
     return rx.el.div(
@@ -623,4 +623,199 @@ def signup_page() -> rx.Component:
             class_name="flex-1 flex items-center justify-center px-6 py-12 bg-white",
         ),
         class_name="min-h-screen flex font-['Inter']",
+    )
+def _strength_meter() -> rx.Component:
+    return rx.cond(
+        ResetPasswordState.new_password != "",
+        rx.vstack(
+            rx.box(
+                rx.box(
+                    width=rx.match(
+                        ResetPasswordState.password_strength,
+                        ("weak", "33%"),
+                        ("medium", "66%"),
+                        ("strong", "100%"),
+                        "0%",
+                    ),
+                    height="4px",
+                    border_radius="2px",
+                    background=rx.match(
+                        ResetPasswordState.password_strength,
+                        ("weak", "#e53e3e"),
+                        ("medium", "#dd6b20"),
+                        ("strong", "#38a169"),
+                        "#cbd5e0",
+                    ),
+                    transition="width 0.2s ease, background 0.2s ease",
+                ),
+                width="100%",
+                height="4px",
+                background="#e2e8f0",
+                border_radius="2px",
+            ),
+            rx.text(
+                rx.match(
+                    ResetPasswordState.password_strength,
+                    ("weak", "Weak password"),
+                    ("medium", "Medium strength"),
+                    ("strong", "Strong password"),
+                    "",
+                ),
+                size="1",
+                color=rx.match(
+                    ResetPasswordState.password_strength,
+                    ("weak", "#e53e3e"),
+                    ("medium", "#dd6b20"),
+                    ("strong", "#38a169"),
+                    "#718096",
+                ),
+            ),
+            width="100%",
+            spacing="1",
+            align_items="start",
+        ),
+    )
+
+
+def _password_field(
+    label: str,
+    value,
+    on_change,
+    show_flag,
+    toggle,
+    placeholder: str,
+) -> rx.Component:
+    return rx.vstack(
+        rx.text(label, size="2", weight="medium"),
+        rx.hstack(
+            rx.input(
+                value=value,
+                on_change=on_change,
+                type=rx.cond(show_flag, "text", "password"),
+                placeholder=placeholder,
+                width="100%",
+            ),
+            rx.button(
+                rx.cond(
+                    show_flag,
+                    rx.icon("eye-off", size=16),
+                    rx.icon("eye", size=16),
+                ),
+                on_click=toggle,
+                variant="ghost",
+                type="button",
+            ),
+            width="100%",
+            align="center",
+        ),
+        width="100%",
+        spacing="1",
+        align_items="start",
+    )
+
+
+def _reset_form() -> rx.Component:
+    return rx.vstack(
+        rx.heading("Reset your password", size="6"),
+        rx.text("Enter a new password for your account.", color="gray", size="2"),
+        _password_field(
+            "New password",
+            ResetPasswordState.new_password,
+            ResetPasswordState.set_new_password,
+            ResetPasswordState.show_new_password,
+            ResetPasswordState.toggle_show_new_password,
+            "Enter new password",
+        ),
+        _strength_meter(),
+        _password_field(
+            "Confirm password",
+            ResetPasswordState.confirm_password,
+            ResetPasswordState.set_confirm_password,
+            ResetPasswordState.show_confirm_password,
+            ResetPasswordState.toggle_show_confirm_password,
+            "Confirm new password",
+        ),
+        rx.cond(
+            ~ResetPasswordState.passwords_match,
+            rx.text("Passwords do not match", color="#e53e3e", size="1"),
+        ),
+        rx.cond(
+            ResetPasswordState.error_message != "",
+            rx.callout(
+                ResetPasswordState.error_message,
+                icon="triangle_alert",
+                color_scheme="red",
+                width="100%",
+            ),
+        ),
+        rx.cond(
+            ResetPasswordState.success_message != "",
+            rx.callout(
+                ResetPasswordState.success_message,
+                icon="check",
+                color_scheme="green",
+                width="100%",
+            ),
+        ),
+        rx.button(
+            rx.cond(
+                ResetPasswordState.is_loading,
+                rx.hstack(rx.spinner(size="2"), rx.text("Updating...")),
+                rx.text("Update password"),
+            ),
+            on_click=ResetPasswordState.update_password,
+            disabled=~ResetPasswordState.can_submit,
+            width="100%",
+            size="3",
+        ),
+        spacing="4",
+        width="100%",
+        max_width="400px",
+        padding="2em",
+    )
+
+
+def _invalid_link() -> rx.Component:
+    return rx.vstack(
+        rx.icon("triangle-alert", size=32, color="#e53e3e"),
+        rx.heading("Link invalid or expired", size="5"),
+        rx.text(
+            rx.cond(
+                ResetPasswordState.error_message != "",
+                ResetPasswordState.error_message,
+                "This password reset link is invalid or has expired.",
+            ),
+            color="gray",
+            text_align="center",
+        ),
+        rx.link(rx.button("Back to Login"), href="/login"),
+        spacing="3",
+        align="center",
+        padding="2em",
+    )
+
+
+def _checking_session() -> rx.Component:
+    return rx.vstack(
+        rx.spinner(size="3"),
+        rx.text("Verifying your reset link..."),
+        spacing="3",
+        align="center",
+    )
+
+
+def reset_password_page() -> rx.Component:
+    return rx.center(
+        rx.cond(
+            ResetPasswordState.checking_session,
+            _checking_session(),
+            rx.cond(
+                ResetPasswordState.session_ready,
+                _reset_form(),
+                _invalid_link(),
+            ),
+        ),
+        min_height="100vh",
+        width="100%",
+        on_mount=ResetPasswordState.on_mount,
     )
