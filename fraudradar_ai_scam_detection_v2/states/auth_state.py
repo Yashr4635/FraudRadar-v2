@@ -615,10 +615,19 @@ class AuthState(rx.State):
         # /reset-password, forwarding the tokens since get_supabase() creates
         # a fresh client on every call, so no session survives server-side
         # between this function and ResetPasswordState.
+        #
+        # NOTE: trailing slash on "/reset-password/" is required. Reflex's
+        # static export serves this route as reset-password/index.html, so
+        # a redirect to the no-slash path 404s on the host (Railway) before
+        # the reset-password page ever gets a chance to load. This was the
+        # root cause of the "click email link -> 404 -> refresh -> works"
+        # bug: refreshing manually re-issued the request with the slash
+        # already present in the address bar (or the browser normalized it),
+        # masking the fact that the redirect itself was wrong.
         if access_token and link_type == "recovery":
             from urllib.parse import quote
             return rx.redirect(
-                f"/reset-password?access_token={quote(access_token)}"
+                f"/reset-password/?access_token={quote(access_token)}"
                 f"&refresh_token={quote(refresh_token)}&type=recovery"
             )
 
@@ -683,7 +692,8 @@ class AuthState(rx.State):
                 user = result.user
                 if user:
                     if verify_type == "recovery":
-                        return rx.redirect("/reset-password")
+                        # Trailing slash required - see note above.
+                        return rx.redirect("/reset-password/")
                     provider = self._extract_provider(user)
                     self._apply_user_session(user, result.session, provider)
                     self._sync_profile_safe()
