@@ -665,8 +665,8 @@ def _reset_password_field(
             rx.el.input(
                 type=rx.cond(show_flag, "text", "password"),
                 placeholder=placeholder,
-                value=value,
-                on_change=on_change,
+                default_value=value,
+                on_change=on_change.debounce(200),
                 class_name="w-full pl-11 pr-11 py-3 rounded-xl border border-gray-200 bg-gray-50/60 text-sm text-gray-900 placeholder-gray-400 focus:outline-hidden focus:ring-4 focus:ring-orange-500/15 focus:border-[#E8471A] focus:bg-white transition-all",
             ),
             rx.el.button(
