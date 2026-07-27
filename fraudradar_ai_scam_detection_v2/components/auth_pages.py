@@ -624,60 +624,30 @@ def signup_page() -> rx.Component:
         ),
         class_name="min-h-screen flex font-['Inter']",
     )
-def _strength_meter() -> rx.Component:
-    return rx.cond(
-        ResetPasswordState.new_password != "",
-        rx.vstack(
-            rx.box(
-                rx.box(
-                    width=rx.match(
-                        ResetPasswordState.password_strength,
-                        ("weak", "33%"),
-                        ("medium", "66%"),
-                        ("strong", "100%"),
-                        "0%",
-                    ),
-                    height="4px",
-                    border_radius="2px",
-                    background=rx.match(
-                        ResetPasswordState.password_strength,
-                        ("weak", "#e53e3e"),
-                        ("medium", "#dd6b20"),
-                        ("strong", "#38a169"),
-                        "#cbd5e0",
-                    ),
-                    transition="width 0.2s ease, background 0.2s ease",
-                ),
-                width="100%",
-                height="4px",
-                background="#e2e8f0",
-                border_radius="2px",
+def _reset_password_alerts() -> rx.Component:
+    return rx.el.div(
+        rx.cond(
+            ResetPasswordState.error_message != "",
+            rx.el.div(
+                rx.icon("circle-alert", class_name="h-4 w-4 text-red-600"),
+                rx.el.p(ResetPasswordState.error_message, class_name="text-sm text-red-700"),
+                class_name="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 mb-4",
             ),
-            rx.text(
-                rx.match(
-                    ResetPasswordState.password_strength,
-                    ("weak", "Weak password"),
-                    ("medium", "Medium strength"),
-                    ("strong", "Strong password"),
-                    "",
-                ),
-                size="1",
-                color=rx.match(
-                    ResetPasswordState.password_strength,
-                    ("weak", "#e53e3e"),
-                    ("medium", "#dd6b20"),
-                    ("strong", "#38a169"),
-                    "#718096",
-                ),
+            rx.fragment(),
+        ),
+        rx.cond(
+            ResetPasswordState.success_message != "",
+            rx.el.div(
+                rx.icon("circle-check", class_name="h-4 w-4 text-green-600"),
+                rx.el.p(ResetPasswordState.success_message, class_name="text-sm text-green-700"),
+                class_name="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 mb-4",
             ),
-            width="100%",
-            spacing="1",
-            align_items="start",
+            rx.fragment(),
         ),
     )
 
 
-def _password_field(
+def _reset_password_field(
     label: str,
     value,
     on_change,
@@ -685,40 +655,99 @@ def _password_field(
     toggle,
     placeholder: str,
 ) -> rx.Component:
-    return rx.vstack(
-        rx.text(label, size="2", weight="medium"),
-        rx.hstack(
-            rx.input(
-                value=value,
-                on_change=on_change,
+    return rx.el.div(
+        rx.el.label(label, class_name="block text-xs font-semibold text-gray-700 mb-1.5 tracking-wide"),
+        rx.el.div(
+            rx.icon(
+                "lock",
+                class_name="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-[#E8471A] transition-colors",
+            ),
+            rx.el.input(
                 type=rx.cond(show_flag, "text", "password"),
                 placeholder=placeholder,
-                width="100%",
+                value=value,
+                on_change=on_change,
+                class_name="w-full pl-11 pr-11 py-3 rounded-xl border border-gray-200 bg-gray-50/60 text-sm text-gray-900 placeholder-gray-400 focus:outline-hidden focus:ring-4 focus:ring-orange-500/15 focus:border-[#E8471A] focus:bg-white transition-all",
             ),
-            rx.button(
-                rx.cond(
-                    show_flag,
-                    rx.icon("eye-off", size=16),
-                    rx.icon("eye", size=16),
+            rx.el.button(
+                rx.icon(
+                    rx.cond(show_flag, "eye-off", "eye"),
+                    class_name="h-4 w-4",
                 ),
-                on_click=toggle,
-                variant="ghost",
                 type="button",
+                on_click=toggle,
+                class_name="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md text-gray-400 hover:text-[#E8471A] hover:bg-orange-50 flex items-center justify-center transition-colors",
             ),
-            width="100%",
-            align="center",
+            class_name="group relative",
         ),
-        width="100%",
-        spacing="1",
-        align_items="start",
+        class_name="mt-4",
+    )
+
+
+def _strength_meter() -> rx.Component:
+    return rx.cond(
+        ResetPasswordState.new_password != "",
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    class_name=rx.match(
+                        ResetPasswordState.password_strength,
+                        ("weak", "h-full rounded-full bg-red-500 transition-all"),
+                        ("medium", "h-full rounded-full bg-orange-500 transition-all"),
+                        ("strong", "h-full rounded-full bg-green-500 transition-all"),
+                        "h-full rounded-full bg-gray-200 transition-all",
+                    ),
+                    style={
+                        "width": rx.match(
+                            ResetPasswordState.password_strength,
+                            ("weak", "33%"),
+                            ("medium", "66%"),
+                            ("strong", "100%"),
+                            "0%",
+                        )
+                    },
+                ),
+                class_name="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden",
+            ),
+            rx.el.p(
+                rx.match(
+                    ResetPasswordState.password_strength,
+                    ("weak", "Weak password"),
+                    ("medium", "Medium strength"),
+                    ("strong", "Strong password"),
+                    "",
+                ),
+                class_name=rx.match(
+                    ResetPasswordState.password_strength,
+                    ("weak", "text-[11px] font-medium text-red-600 mt-1"),
+                    ("medium", "text-[11px] font-medium text-orange-600 mt-1"),
+                    ("strong", "text-[11px] font-medium text-green-600 mt-1"),
+                    "text-[11px] font-medium text-gray-500 mt-1",
+                ),
+            ),
+            class_name="mt-2",
+        ),
+        rx.fragment(),
     )
 
 
 def _reset_form() -> rx.Component:
-    return rx.vstack(
-        rx.heading("Reset your password", size="6"),
-        rx.text("Enter a new password for your account.", color="gray", size="2"),
-        _password_field(
+    return rx.el.div(
+        rx.el.div(
+            rx.el.div(class_name="h-2 w-2 rounded-full bg-green-500 animate-pulse"),
+            rx.el.span("All systems secure", class_name="text-[11px] font-semibold text-green-700"),
+            class_name="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 w-fit mb-4",
+        ),
+        rx.el.div(
+            rx.el.h1("Reset your password", class_name="text-3xl font-extrabold tracking-tight text-gray-900"),
+            rx.el.p(
+                "Enter a new password for your account.",
+                class_name="text-sm text-gray-500 mt-2 leading-relaxed",
+            ),
+            class_name="mb-7",
+        ),
+        _reset_password_alerts(),
+        _reset_password_field(
             "New password",
             ResetPasswordState.new_password,
             ResetPasswordState.set_new_password,
@@ -727,7 +756,7 @@ def _reset_form() -> rx.Component:
             "Enter new password",
         ),
         _strength_meter(),
-        _password_field(
+        _reset_password_field(
             "Confirm password",
             ResetPasswordState.confirm_password,
             ResetPasswordState.set_confirm_password,
@@ -737,85 +766,120 @@ def _reset_form() -> rx.Component:
         ),
         rx.cond(
             ~ResetPasswordState.passwords_match,
-            rx.text("Passwords do not match", color="#e53e3e", size="1"),
+            rx.el.p("Passwords do not match", class_name="text-[11px] font-medium text-red-600 mt-1.5"),
+            rx.fragment(),
         ),
-        rx.cond(
-            ResetPasswordState.error_message != "",
-            rx.callout(
-                ResetPasswordState.error_message,
-                icon="triangle_alert",
-                color_scheme="red",
-                width="100%",
-            ),
-        ),
-        rx.cond(
-            ResetPasswordState.success_message != "",
-            rx.callout(
-                ResetPasswordState.success_message,
-                icon="check",
-                color_scheme="green",
-                width="100%",
-            ),
-        ),
-        rx.button(
+        rx.el.button(
             rx.cond(
                 ResetPasswordState.is_loading,
-                rx.hstack(rx.spinner(size="2"), rx.text("Updating...")),
-                rx.text("Update password"),
+                rx.fragment(
+                    rx.icon("loader-circle", class_name="h-4 w-4 animate-spin"),
+                    rx.el.span("Updating..."),
+                ),
+                rx.fragment(
+                    rx.icon("key-round", class_name="h-4 w-4"),
+                    rx.el.span("Update password"),
+                ),
             ),
             on_click=ResetPasswordState.update_password,
             disabled=~ResetPasswordState.can_submit,
-            width="100%",
-            size="3",
+            class_name="group w-full mt-6 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#E8471A] to-[#c43a13] hover:from-[#c43a13] hover:to-[#a82e0d] text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-300/50 hover:shadow-xl hover:shadow-orange-400/50 hover:-translate-y-0.5 active:translate-y-0 focus:outline-hidden focus:ring-4 focus:ring-orange-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0",
         ),
-        spacing="4",
-        width="100%",
-        max_width="400px",
-        padding="2em",
+        rx.el.div(
+            rx.icon("shield-check", class_name="h-3.5 w-3.5 text-green-600"),
+            rx.el.span(
+                "Reset links expire in 1 hour for your security.",
+                class_name="text-[11px] text-gray-600 font-medium",
+            ),
+            class_name="flex items-center justify-center gap-1.5 mt-3 px-3 py-2 rounded-lg bg-green-50/60 border border-green-100",
+        ),
+        class_name="relative bg-white border border-gray-100 rounded-[18px] shadow-[0_8px_40px_-12px_rgba(232,71,26,0.15)] p-7 sm:p-9 w-full max-w-md",
     )
 
 
 def _invalid_link() -> rx.Component:
-    return rx.vstack(
-        rx.icon("triangle-alert", size=32, color="#e53e3e"),
-        rx.heading("Link invalid or expired", size="5"),
-        rx.text(
+    return rx.el.div(
+        rx.el.div(
+            rx.icon("triangle-alert", class_name="h-7 w-7 text-white"),
+            class_name="h-14 w-14 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center mx-auto shadow-lg shadow-red-200/60",
+        ),
+        rx.el.h1(
+            "Link invalid or expired",
+            class_name="text-xl font-bold text-gray-900 mt-5 text-center",
+        ),
+        rx.el.p(
             rx.cond(
                 ResetPasswordState.error_message != "",
                 ResetPasswordState.error_message,
                 "This password reset link is invalid or has expired.",
             ),
-            color="gray",
-            text_align="center",
+            class_name="text-sm text-gray-500 text-center mt-2 max-w-sm",
         ),
-        rx.link(rx.button("Back to Login"), href="/login"),
-        spacing="3",
-        align="center",
-        padding="2em",
+        rx.el.a(
+            "Back to Login",
+            href="/login",
+            class_name="group mt-6 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#E8471A] to-[#c43a13] hover:from-[#c43a13] hover:to-[#a82e0d] text-white py-3 px-6 rounded-xl font-bold text-sm shadow-lg shadow-orange-300/50 hover:shadow-xl hover:-translate-y-0.5 transition-all",
+        ),
+        class_name="relative bg-white border border-gray-100 rounded-[18px] shadow-[0_8px_40px_-12px_rgba(232,71,26,0.15)] p-8 w-full max-w-md flex flex-col items-center",
     )
 
 
 def _checking_session() -> rx.Component:
-    return rx.vstack(
-        rx.spinner(size="3"),
-        rx.text("Verifying your reset link..."),
-        spacing="3",
-        align="center",
+    return rx.el.div(
+        rx.el.div(
+            rx.icon("shield-check", class_name="h-7 w-7 text-white"),
+            class_name="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#E8471A] to-[#c43a13] flex items-center justify-center mx-auto shadow-lg shadow-orange-200/60",
+        ),
+        rx.el.h1(
+            "Verifying your reset link...",
+            class_name="text-xl font-bold text-gray-900 mt-5 text-center",
+        ),
+        rx.el.p(
+            "Just a moment while we confirm this is really you.",
+            class_name="text-sm text-gray-500 text-center mt-2 max-w-sm",
+        ),
+        rx.el.div(
+            rx.icon("loader-circle", class_name="h-5 w-5 animate-spin text-[#E8471A]"),
+            class_name="flex items-center justify-center mt-6",
+        ),
+        class_name="relative bg-white border border-gray-100 rounded-[18px] shadow-[0_8px_40px_-12px_rgba(232,71,26,0.15)] p-8 w-full max-w-md flex flex-col items-center",
     )
 
 
 def reset_password_page() -> rx.Component:
-    return rx.center(
-        rx.cond(
-            ResetPasswordState.checking_session,
-            _checking_session(),
-            rx.cond(
-                ResetPasswordState.session_ready,
-                _reset_form(),
-                _invalid_link(),
+    return rx.el.div(
+        login_marketing_panel(),
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    rx.icon("shield-check", class_name="h-5 w-5 text-white"),
+                    class_name="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#E8471A] to-[#c43a13] flex items-center justify-center lg:hidden shadow-lg shadow-orange-200/60",
+                ),
+                rx.el.div(
+                    rx.el.p("FraudRadar", class_name="text-sm font-bold text-gray-900 lg:hidden"),
+                    rx.el.p("Scam Defense AI", class_name="text-[10px] text-gray-500 font-medium lg:hidden"),
+                ),
+                class_name="flex items-center gap-3 lg:hidden mb-8",
             ),
+            rx.cond(
+                ResetPasswordState.checking_session,
+                _checking_session(),
+                rx.cond(
+                    ResetPasswordState.session_ready,
+                    _reset_form(),
+                    _invalid_link(),
+                ),
+            ),
+            rx.el.div(
+                rx.el.a("Privacy Policy", href="/legal", class_name="text-[11px] text-gray-500 hover:text-[#E8471A] font-medium"),
+                rx.el.span(class_name="h-3 w-px bg-gray-300"),
+                rx.el.a("Terms", href="/legal", class_name="text-[11px] text-gray-500 hover:text-[#E8471A] font-medium"),
+                rx.el.span(class_name="h-3 w-px bg-gray-300"),
+                rx.el.a("Help Center", href="/helpline", class_name="text-[11px] text-gray-500 hover:text-[#E8471A] font-medium"),
+                class_name="flex items-center justify-center gap-3 mt-6 flex-wrap",
+            ),
+            class_name="flex-1 flex flex-col items-center justify-center px-6 py-10 bg-gradient-to-br from-gray-50 via-white to-orange-50/30 lg:basis-[45%]",
         ),
-        min_height="100vh",
-        width="100%",
+        class_name="min-h-screen flex font-['Inter'] antialiased",
         on_mount=ResetPasswordState.on_mount,
     )

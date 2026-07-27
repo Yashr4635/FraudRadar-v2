@@ -50,6 +50,13 @@ class ResetPasswordState(rx.State):
     error_message: str = ""
     success_message: str = ""
 
+    # get_supabase() creates a brand-new client on every call (it's not a
+    # singleton), so a session set in one call is gone by the next. These
+    # persist the tokens on state so update_password() can re-establish the
+    # same recovery session right before calling update_user().
+    _recovery_access_token: str = ""
+    _recovery_refresh_token: str = ""
+
     # ---------------- session detection ----------------
 
     def on_mount(self):
@@ -89,9 +96,15 @@ class ResetPasswordState(rx.State):
             supabase = get_supabase()
             if access_token and refresh_token and token_type == "recovery":
                 supabase.auth.set_session(access_token, refresh_token)
+                self._recovery_access_token = access_token
+                self._recovery_refresh_token = refresh_token
                 self.session_ready = True
             elif code:
-                supabase.auth.exchange_code_for_session({"auth_code": code})
+                result = supabase.auth.exchange_code_for_session({"auth_code": code})
+                session = getattr(result, "session", None)
+                if session:
+                    self._recovery_access_token = getattr(session, "access_token", "") or ""
+                    self._recovery_refresh_token = getattr(session, "refresh_token", "") or ""
                 self.session_ready = True
             else:
                 self.session_ready = False
@@ -182,6 +195,14 @@ class ResetPasswordState(rx.State):
 
         try:
             supabase = get_supabase()
+
+            # get_supabase() just created a brand-new, sessionless client -
+            # re-establish the recovery session on it before updating,
+            # otherwise Supabase rejects with "Auth session missing!".
+            if self._recovery_access_token and self._recovery_refresh_token:
+                supabase.auth.set_session(
+                    self._recovery_access_token, self._recovery_refresh_token
+                )
 
             # Official Supabase Auth API call - updates the user tied to
             # the recovery session established in handle_recovery_tokens.
