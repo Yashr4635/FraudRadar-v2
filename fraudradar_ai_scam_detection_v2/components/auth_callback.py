@@ -5,25 +5,6 @@ from fraudradar_ai_scam_detection_v2.states.auth_state import AuthState
 def auth_callback_page() -> rx.Component:
     return rx.el.div(
 
-        ("""
-        (function () {
-            const hash = window.location.hash.substring(1);
-            const params = new URLSearchParams(hash);
-            const access_token = params.get("access_token");
-            const refresh_token = params.get("refresh_token");
-            const type = params.get("type");
-            if (access_token) {
-                window.location.href =
-                    "/auth/callback?access_token=" +
-                    encodeURIComponent(access_token) +
-                    "&refresh_token=" +
-                    encodeURIComponent(refresh_token || "") +
-                    "&type=" +
-                    encodeURIComponent(type || "");
-            }
-        })();
-        """),
-
         rx.el.div(
             rx.el.div(
                 rx.icon("shield-check", class_name="h-7 w-7 text-white"),

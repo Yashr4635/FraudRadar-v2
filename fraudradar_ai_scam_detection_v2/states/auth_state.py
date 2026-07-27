@@ -33,6 +33,24 @@ DEPLOYED_SANDBOX_URL = (
     "https://8080-c7830b68-cdf4-4aa9-8d7f-9c7ceef90fe6.build.reflexsandbox.com"
 )
 
+# Reads Supabase's implicit-flow hash fragment directly, client-side, and
+# hands it back to the Python event handler via rx.call_script. This avoids
+# a race between on_mount (which fires immediately, before the hash is
+# visible server-side) and a separate full-page-reload script that used to
+# try to forward the hash as query params - that reload could lose the race
+# against on_mount's own fallback redirect.
+_EXTRACT_AUTH_HASH_JS = """
+(function () {
+    var hash = window.location.hash.substring(1);
+    var params = new URLSearchParams(hash);
+    return JSON.stringify({
+        access_token: params.get('access_token'),
+        refresh_token: params.get('refresh_token'),
+        type: params.get('type')
+    });
+})()
+"""
+
 
 def get_app_base_url() -> str:
     for var in (
@@ -554,17 +572,44 @@ class AuthState(rx.State):
 
     @rx.event
     def handle_auth_callback(self):
-        """Handle Supabase email verification / OAuth return."""
+        """Handle Supabase email verification / OAuth return.
+
+        Kicks off client-side hash extraction first (rx.call_script) instead
+        of processing query params immediately - on the very first page
+        load, tokens from an implicit-flow link are only in the URL hash,
+        which the server can never see. Processing used to fall through to
+        a generic "no tokens found" fallback before the hash-forwarding
+        script had a chance to run, which is what caused a recovery link
+        to bounce to /login with a misleading "Email verified" message.
+        """
+        return rx.call_script(
+            _EXTRACT_AUTH_HASH_JS,
+            callback=AuthState.process_auth_callback,
+        )
+
+    @rx.event
+    def process_auth_callback(self, raw: str):
+        """Actual callback logic. `raw` is the JSON string produced by
+        _EXTRACT_AUTH_HASH_JS - guaranteed to reflect the page's hash at
+        the time this runs, so there's no more race with query-param-only
+        parsing."""
+        import json as _json
+        try:
+            hash_data = _json.loads(raw) if raw else {}
+        except (TypeError, ValueError):
+            hash_data = {}
 
         # FIX 1: define qp once, outside try block, so it's always available
         from urllib.parse import urlparse, parse_qs
         parsed = urlparse(str(self.router.url))
         qp = {k: v[0] for k, v in parse_qs(parsed.query).items()}  
 
-        # Handle implicit flow access_token
-        access_token = qp.get("access_token")
-        refresh_token = qp.get("refresh_token", "")
-        link_type = qp.get("type", "")
+        # Handle implicit flow access_token - prefer hash-extracted values
+        # (the real source for implicit-flow links), fall back to query
+        # params for flows that arrive via ?access_token=... directly.
+        access_token = hash_data.get("access_token") or qp.get("access_token")
+        refresh_token = hash_data.get("refresh_token") or qp.get("refresh_token", "")
+        link_type = hash_data.get("type") or qp.get("type", "")
 
         # Password recovery must never be treated as a login - route it to
         # /reset-password, forwarding the tokens since get_supabase() creates
@@ -656,10 +701,10 @@ class AuthState(rx.State):
             )
             return rx.redirect("/login")
 
-        # Implicit flow: Supabase returns access_token + refresh_token as
-        # query params (forwarded from the hash by auth_callback.py JS).
-        access_token = qp.get("access_token")
-        refresh_token = qp.get("refresh_token", "")
+        # Implicit flow: Supabase returns access_token + refresh_token,
+        # either in the hash (extracted above) or as query params.
+        access_token = hash_data.get("access_token") or qp.get("access_token")
+        refresh_token = hash_data.get("refresh_token") or qp.get("refresh_token", "")
 
         if access_token:
             logging.info("OAuth implicit: access_token received, setting session")
