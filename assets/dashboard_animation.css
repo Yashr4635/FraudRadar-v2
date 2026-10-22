@@ -71,3 +71,14 @@
 .status-dot {
   animation: pulse-ring 2s infinite;
 }
+
+/* ─── Hide Built with Reflex Badge ─── */
+#__reflex_badge,
+.reflex-badge-container,
+a[href*="reflex.dev"],
+div[class*="reflex-badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

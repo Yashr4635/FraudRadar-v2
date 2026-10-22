@@ -475,17 +475,35 @@ class AuthState(rx.State):
             return
         self.google_loading = True
         try:
-            callback_url = get_auth_callback_url()
+            callback_url = None
+            try:
+                headers = getattr(self.router, "headers", None)
+                if headers:
+                    origin = getattr(headers, "origin", "") or getattr(headers, "host", "")
+                    if origin:
+                        origin_str = str(origin).strip()
+                        if not origin_str.startswith("http"):
+                            origin_str = f"https://{origin_str}"
+                        callback_url = f"{origin_str.rstrip('/')}/auth/callback"
+            except Exception:
+                pass
+
+            if not callback_url:
+                current_url = str(getattr(self.router, "url", "") or "")
+                if current_url.startswith("http"):
+                    from urllib.parse import urlparse
+                    parsed = urlparse(current_url)
+                    scheme = parsed.scheme or ("http" if "localhost" in parsed.netloc else "https")
+                    callback_url = f"{scheme}://{parsed.netloc}/auth/callback"
+
+            if not callback_url:
+                callback_url = get_auth_callback_url()
+
             logging.info(f"Initiating Google OAuth redirect to: {callback_url}")
             res = sb.auth.sign_in_with_oauth({
                 "provider": "google",
                 "options": {
                     "redirect_to": callback_url,
-                    "scopes": "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
-                    "query_params": {
-                        "prompt": "select_account",
-                        "access_type": "offline",
-                    },
                 },
             })
             oauth_url = getattr(res, "url", None)
