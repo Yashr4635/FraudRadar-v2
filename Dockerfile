@@ -16,6 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 3000
+EXPOSE 10000
 
-CMD ["sh", "-c", "reflex run --env prod --frontend-port ${PORT:-3000}"]
+CMD ["sh", "-c", "reflex run --env prod --single-port --frontend-port ${PORT:-10000}"]

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: fraudradar-v2
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: qwen/qwen3.8-27b
+      - key: VIRUSTOTAL_API_KEY
+        sync: false
+      - key: GOOGLE_SAFE_BROWSING_API_KEY
+        sync: false

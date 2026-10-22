@@ -1,0 +1,10 @@
+.venv
+.git
+.web
+__pycache__
+*.pyc
+.env
+.states
+uploaded_files
+tests
+.DS_Store

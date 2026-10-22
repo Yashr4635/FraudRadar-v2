@@ -47,6 +47,11 @@ app.add_page(
     route="/login",
     title="FraudRadar | Login",
 )
+app.add_page(
+    signup_page,
+    route="/signup",
+    title="FraudRadar | Sign Up",
+)
 
 app.add_page(
     reset_password_page,

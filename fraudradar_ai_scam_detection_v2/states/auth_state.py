@@ -46,7 +46,10 @@ _EXTRACT_AUTH_HASH_JS = """
     return JSON.stringify({
         access_token: params.get('access_token'),
         refresh_token: params.get('refresh_token'),
-        type: params.get('type')
+        type: params.get('type'),
+        error: params.get('error'),
+        error_code: params.get('error_code'),
+        error_description: params.get('error_description')
     });
 })()
 """
@@ -59,6 +62,10 @@ def get_app_base_url() -> str:
         "PUBLIC_APP_URL",
         "REFLEX_PUBLIC_URL",
         "NEXT_PUBLIC_SITE_URL",
+        "RAILWAY_PUBLIC_DOMAIN",
+        "RAILWAY_STATIC_URL",
+        "RENDER_EXTERNAL_URL",
+        "RENDER_EXTERNAL_HOSTNAME",
         "VERCEL_URL",
     ):
         val = os.getenv(var)
@@ -75,9 +82,9 @@ def get_app_base_url() -> str:
         if not s.startswith("http"):
             s = "https://" + s
         return s
-    if DEPLOYED_SANDBOX_URL:
-        return DEPLOYED_SANDBOX_URL.rstrip("/")
-    return "http://localhost:3001"
+    if os.getenv("DEPLOYED_SANDBOX_URL"):
+        return os.getenv("DEPLOYED_SANDBOX_URL").strip().rstrip("/")
+    return os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 def get_auth_callback_url() -> str:
@@ -237,6 +244,7 @@ class AuthState(rx.State):
     auth_success: str = ""
     _code_verifier: str = ""
     loading: bool = False
+    google_loading: bool = False
     remember_me: bool = True
 
     login_email: str = ""
@@ -453,6 +461,49 @@ class AuthState(rx.State):
         self.loading = False
 
     @rx.event
+    def login_with_google(self):
+        if self.loading or self.google_loading:
+            return
+        self.auth_error = ""
+        self.auth_success = ""
+        sb = get_supabase()
+        if sb is None:
+            self.auth_error = (
+                "Authentication service is not configured. "
+                "Please configure SUPABASE_URL and SUPABASE_KEY in your .env file."
+            )
+            return
+        self.google_loading = True
+        try:
+            callback_url = get_auth_callback_url()
+            logging.info(f"Initiating Google OAuth redirect to: {callback_url}")
+            res = sb.auth.sign_in_with_oauth({
+                "provider": "google",
+                "options": {
+                    "redirect_to": callback_url,
+                    "scopes": "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid",
+                    "query_params": {
+                        "prompt": "select_account",
+                        "access_type": "offline",
+                    },
+                },
+            })
+            oauth_url = getattr(res, "url", None)
+            if oauth_url:
+                self.google_loading = False
+                return rx.redirect(oauth_url)
+            else:
+                self.auth_error = "Could not initialize Google sign-in. Please try again."
+        except Exception as e:
+            if _is_expected_auth_error(e):
+                logging.warning(f"Expected auth validation in Google OAuth: {e}")
+            else:
+                logging.exception(f"Google sign-in error: {e}")
+            self.auth_error = _friendly_auth_error(e, "Google sign-in")
+        finally:
+            self.google_loading = False
+
+    @rx.event
     def signup(self):
         if self.loading:
             return
@@ -539,6 +590,7 @@ class AuthState(rx.State):
         self.auth_error = ""
         self.auth_success = ""
         self.loading = False
+        self.google_loading = False
         self.forgot_loading = False
         self.forgot_email = ""
         self.forgot_error = ""
@@ -653,23 +705,39 @@ class AuthState(rx.State):
         # Detect provider-side errors
         try:
             err_code = (
-                qp.get("error")
+                hash_data.get("error")
+                or qp.get("error")
+                or hash_data.get("error_code")
                 or qp.get("error_code")
+                or ""
+            )
+            err_desc = (
+                hash_data.get("error_description")
                 or qp.get("error_description")
                 or ""
             )
-            if err_code:
-                low = str(err_code).lower()
-                if "access_denied" in low or "cancel" in low:
+            if err_code or err_desc:
+                logging.warning(f"OAuth callback error: code={err_code}, desc={err_desc}")
+                combined = f"{err_code} {err_desc}".lower()
+                if "access_denied" in combined or "cancel" in combined:
                     self.auth_error = "Sign-in was cancelled. Please try again."
-                elif "expired" in low or "invalid" in low:
+                elif "expired" in combined or "invalid" in combined:
                     self.auth_error = (
                         "This link has expired or is invalid. "
                         "Please request a new one and try again."
                     )
+                elif "exchange external code" in combined:
+                    self.auth_error = (
+                        "Google sign-in configuration error: Unable to exchange code. "
+                        "Please verify your Google Client Secret in Supabase Providers, "
+                        "and ensure the redirect URI is saved in Google Cloud."
+                    )
+                elif err_desc:
+                    clean_desc = err_desc.replace("+", " ").strip()
+                    self.auth_error = f"Sign-in error: {clean_desc}"
                 else:
                     self.auth_error = (
-                        "We couldn't complete sign-in. Please try again."
+                        "We couldn't complete sign-in. Please check provider settings and try again."
                     )
                 return rx.redirect("/login")
         except Exception:
@@ -731,8 +799,14 @@ class AuthState(rx.State):
         if code and not access_token:
             logging.info(f"OAuth code flow: exchanging code")
             try:
-                sb.auth.exchange_code_for_session({"auth_code": code})
+                auth_resp = sb.auth.exchange_code_for_session({"auth_code": code})
                 logging.info("OAuth code exchanged successfully")
+                if auth_resp and getattr(auth_resp, "user", None):
+                    provider = self._extract_provider(auth_resp.user)
+                    self._apply_user_session(auth_resp.user, auth_resp.session, provider)
+                    self.auth_success = "Welcome to FraudRadar!"
+                    self._sync_profile_safe()
+                    return rx.redirect("/dashboard")
             except Exception as e:
                 logging.exception(f"OAuth exchange failed: {e}")
                 self.auth_error = "We couldn't complete sign in. Please try again."
@@ -807,8 +881,20 @@ class AuthState(rx.State):
                 )
                 or {}
             )
-            prov = app_meta.get("provider") or "email"
-            return str(prov)
+            prov = app_meta.get("provider")
+            if not prov and app_meta.get("providers"):
+                providers = app_meta.get("providers")
+                if isinstance(providers, list) and len(providers) > 0:
+                    prov = providers[0]
+            if not prov and hasattr(user, "identities") and user.identities:
+                for ident in user.identities:
+                    ident_prov = getattr(ident, "provider", None) or (
+                        ident.get("provider") if isinstance(ident, dict) else None
+                    )
+                    if ident_prov:
+                        prov = ident_prov
+                        break
+            return str(prov or "email")
         except Exception:
             logging.exception("provider extract")
             return "email"

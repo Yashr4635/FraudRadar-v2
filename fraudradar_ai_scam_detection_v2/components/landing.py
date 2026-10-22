@@ -834,13 +834,13 @@ def landing_page() -> rx.Component:
                     ),
                     rx.el.h2(
                         "Everything you need to stay scam-free",
-                        class_name="text-3xl sm:text-4xl font-bold text-gray-900 mt-3 max-w-2xl",
+                        class_name="text-3xl sm:text-4xl font-bold text-gray-900 mt-3 max-w-2xl mx-auto text-center",
                     ),
                     rx.el.p(
                         "Built specifically for the Indian threat landscape with AI trained on local fraud patterns.",
-                        class_name="text-base text-gray-600 mt-4 max-w-2xl",
+                        class_name="text-base text-gray-600 mt-4 max-w-2xl mx-auto text-center",
                     ),
-                    class_name="mb-12 text-center mx-auto",
+                    class_name="mb-12 text-center mx-auto flex flex-col items-center",
                 ),
                 rx.el.div(
                     feature_card(

@@ -9,7 +9,7 @@ except Exception:
     logging.exception("Failed to import groq SDK")
     Groq = None
 
-MODEL_NAME = "llama-3.3-70b-versatile"
+MODEL_NAME = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 MAX_HISTORY_MESSAGES = 12  # ~6 exchanges sent to the API, keeps token usage bounded
 REQUEST_TIMEOUT_SECONDS = 20.0
 
@@ -51,6 +51,60 @@ GENERIC_FALLBACK = (
 )
 
 
+def _offline_smart_reply(query: str) -> str:
+    q = (query or "").lower().strip()
+    if any(w in q for w in ("hello", "hi", "hey", "who are you", "start")):
+        return (
+            "Hello! I am FraudRadar's Scam Defense Assistant. I help you detect phishing, "
+            "verify suspicious messages, and guide you on what to do if you suspect a scam. "
+            "How can I help you today?"
+        )
+    if "upi" in q or "collect request" in q or "qr" in q:
+        return (
+            "⚠️ Suspicious UPI Advice:\n"
+            "1. NEVER enter your UPI PIN to receive money. UPI PIN is only needed to SEND or DEDUCT money.\n"
+            "2. Decline or reject the request immediately in your UPI app (PhonePe, GPay, Paytm).\n"
+            "3. Block the sender's UPI ID and report it inside your UPI app.\n"
+            "4. If money was already deducted, immediately call National Cyber Helpline 1930 and report on cybercrime.gov.in."
+        )
+    if "otp" in q or "pin" in q or "cvv" in q or "bank" in q:
+        return (
+            "🛑 Critical Warning:\n"
+            "Legitimate banks, RBI, and government departments NEVER ask for your OTP, UPI PIN, or CVV over call, SMS, or WhatsApp.\n"
+            "1. Do not share the OTP under any circumstance.\n"
+            "2. Hang up or block the caller immediately.\n"
+            "3. Contact your bank directly using the official number on the back of your card."
+        )
+    if "link" in q or "click" in q or "url" in q:
+        return (
+            "🔗 Suspicious Link Action Plan:\n"
+            "1. Do NOT enter any passwords, banking details, or phone numbers on the page.\n"
+            "2. Close the browser tab immediately and turn off Wi-Fi/mobile data if a file or APK started downloading.\n"
+            "3. If you entered card or banking credentials, call your bank's emergency helpline immediately to block your card/account."
+        )
+    if "report" in q or "cybercrime" in q or "1930" in q or "police" in q:
+        return (
+            "🚨 How to Report Fraud in India:\n"
+            "1. Call the National Cyber Crime Helpline: 1930 (available 24/7).\n"
+            "2. File a formal complaint online at https://cybercrime.gov.in.\n"
+            "3. Keep transaction IDs, screenshots, sender phone numbers, and bank statements ready as evidence."
+        )
+    if "loan" in q or "contacts" in q:
+        return (
+            "📱 Loan App Safety Warning:\n"
+            "Many illegal lending apps request full contacts and gallery access to harass and blackmail victims.\n"
+            "1. Only use RBI-registered NBFCs or commercial banks.\n"
+            "2. Never grant 'Contacts' or 'Media/Photos' permissions to loan apps.\n"
+            "3. If harassed, report the app to Google Play Store and file a complaint at 1930."
+        )
+    return (
+        "FraudRadar Advisory: For any suspected scam: "
+        "1) Never share OTP/PIN/CVV, 2) Call helpline 1930, "
+        "3) Report at cybercrime.gov.in, 4) Verify only through official bank apps. "
+        "\n\nTip: To enable full conversational AI with live Groq LLM, add your free GROQ_API_KEY to your .env file."
+    )
+
+
 class ChatMsg(TypedDict):
     role: str
     content: str
@@ -71,35 +125,16 @@ class AssistantState(rx.State):
     def clear_chat(self):
         self.messages = []
 
-    @rx.event
-    def send_message(self, form_data: dict):
-        msg = (form_data.get("message") or "").strip()
-        if not msg or self.is_thinking:
-            return
-
-        self.messages.append({"role": "user", "content": msg})
-        self.is_thinking = True
-        # Flush this state update to the client now (clears input, shows
-        # the thinking indicator) before the blocking API call below.
-        yield rx.set_value("chat-input", "")
-
-        history = list(self.messages)
-        try:
-            reply = self._get_reply(history)
-        except Exception as e:
-            logging.exception(f"Assistant top-level error: {e}")
-            reply = GENERIC_FALLBACK
-
-        if not reply or not reply.strip():
-            reply = GENERIC_FALLBACK
-
-        self.messages.append({"role": "assistant", "content": reply})
-        self.is_thinking = False
-
     def _get_reply(self, history: list[ChatMsg]) -> str:
         api_key = os.getenv("GROQ_API_KEY")
+        last_user_msg = ""
+        for m in reversed(history):
+            if m.get("role") == "user":
+                last_user_msg = m.get("content", "")
+                break
+
         if not api_key or Groq is None:
-            return OFFLINE_FALLBACK
+            return _offline_smart_reply(last_user_msg)
 
         try:
             client = Groq(api_key=api_key, timeout=REQUEST_TIMEOUT_SECONDS)
