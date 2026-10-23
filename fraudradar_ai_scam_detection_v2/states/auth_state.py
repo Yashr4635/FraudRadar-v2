@@ -517,17 +517,13 @@ class AuthState(rx.State):
         self.auth_success = ""
         self.otp_error = ""
         try:
-            callback_url = get_auth_callback_url()
             sb.auth.sign_in_with_otp({
                 "email": email,
-                "options": {
-                    "email_redirect_to": callback_url,
-                },
             })
             self.otp_email = email
             self.otp_type = "email"
             self.show_otp_view = True
-            self.auth_success = f"Verification code sent to {email}. Please check your inbox."
+            self.auth_success = f"Verification code sent to {email}. Please enter the 6-digit code below."
         except Exception as e:
             logging.exception(f"Send OTP error: {e}")
             self.auth_error = _friendly_auth_error(e, "send verification code")
@@ -723,8 +719,6 @@ class AuthState(rx.State):
                     "password": self.signup_password,
                     "options": {
                         "data": {"full_name": self.signup_name},
-                        "email_redirect_to": callback_url,
-                        "redirect_to": callback_url,
                     },
                 }
             )
