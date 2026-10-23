@@ -273,6 +273,15 @@ class AuthState(rx.State):
     change_password_success: str = ""
     change_password_error: str = ""
 
+    # OTP / Email verification flow
+    show_otp_view: bool = False
+    otp_email: str = ""
+    otp_code: str = ""
+    otp_type: str = "signup"
+    otp_loading: bool = False
+    otp_error: str = ""
+    otp_success: str = ""
+
     @rx.event
     def set_login_email(self, v: str):
         self.login_email = v
@@ -451,6 +460,15 @@ class AuthState(rx.State):
             else:
                 self.auth_error = "Invalid email or password."
         except Exception as e:
+            msg = str(e).lower()
+            if "not confirmed" in msg or "email not confirmed" in msg:
+                self.otp_email = self.login_email
+                self.otp_type = "signup"
+                self.show_otp_view = True
+                self.auth_error = ""
+                self.auth_success = f"Please enter the verification code sent to {self.login_email} to activate your account."
+                self.loading = False
+                return
             if _is_expected_auth_error(e):
                 logging.warning(
                     f"Expected auth validation/rate-limit in login: {e}"
@@ -459,6 +477,153 @@ class AuthState(rx.State):
                 logging.exception(f"Login error: {e}")
             self.auth_error = _friendly_auth_error(e, "login")
         self.loading = False
+
+    @rx.event
+    def set_otp_code(self, v: str):
+        self.otp_code = v.strip()
+
+    @rx.event
+    def set_otp_email(self, v: str):
+        self.otp_email = v.strip()
+
+    @rx.event
+    def cancel_otp_view(self):
+        self.show_otp_view = False
+        self.otp_code = ""
+        self.otp_error = ""
+
+    @rx.event
+    def open_otp_login(self):
+        email = (self.login_email or "").strip()
+        if not email or "@" not in email:
+            self.auth_error = "Please enter your email address first."
+            return
+        self.otp_email = email
+        self.otp_type = "email"
+        return self.send_login_otp()
+
+    @rx.event
+    def send_login_otp(self):
+        email = (self.otp_email or self.login_email).strip()
+        if not email or "@" not in email:
+            self.auth_error = "Please enter a valid email address."
+            return
+        sb = get_supabase()
+        if sb is None:
+            self.auth_error = "Authentication service is not configured."
+            return
+        self.otp_loading = True
+        self.auth_error = ""
+        self.auth_success = ""
+        self.otp_error = ""
+        try:
+            callback_url = get_auth_callback_url()
+            sb.auth.sign_in_with_otp({
+                "email": email,
+                "options": {
+                    "email_redirect_to": callback_url,
+                },
+            })
+            self.otp_email = email
+            self.otp_type = "email"
+            self.show_otp_view = True
+            self.auth_success = f"Verification code sent to {email}. Please check your inbox."
+        except Exception as e:
+            logging.exception(f"Send OTP error: {e}")
+            self.auth_error = _friendly_auth_error(e, "send verification code")
+        finally:
+            self.otp_loading = False
+
+    @rx.event
+    def verify_email_otp(self):
+        code = self.otp_code.strip()
+        email = (self.otp_email or self.login_email or self.signup_email).strip()
+        if not code:
+            self.otp_error = "Please enter the verification code."
+            return
+        if not email:
+            self.otp_error = "Email address missing. Please go back and try again."
+            return
+        sb = get_supabase()
+        if sb is None:
+            self.otp_error = "Authentication service is not configured."
+            return
+        self.otp_loading = True
+        self.otp_error = ""
+        try:
+            primary_type = self.otp_type or "signup"
+            secondary_type = "email" if primary_type == "signup" else "signup"
+            result = None
+            try:
+                result = sb.auth.verify_otp({
+                    "email": email,
+                    "token": code,
+                    "type": primary_type,
+                })
+            except Exception as e1:
+                logging.info(f"verify_otp {primary_type} failed: {e1}, trying {secondary_type}")
+                try:
+                    result = sb.auth.verify_otp({
+                        "email": email,
+                        "token": code,
+                        "type": secondary_type,
+                    })
+                except Exception:
+                    raise e1
+
+            if result and result.user:
+                provider = self._extract_provider(result.user)
+                self._apply_user_session(
+                    result.user,
+                    result.session,
+                    provider,
+                    fallback_name=self.signup_name,
+                )
+                self.auth_success = "Email verified successfully!"
+                self.show_otp_view = False
+                self.otp_code = ""
+                self._sync_profile_safe()
+                return rx.redirect("/dashboard")
+            else:
+                self.otp_error = "Invalid or expired verification code."
+        except Exception as e:
+            logging.exception(f"Verify OTP error: {e}")
+            msg = str(e).lower()
+            if "expired" in msg or "invalid" in msg or "token" in msg:
+                self.otp_error = "Invalid or expired verification code. Please request a new one."
+            else:
+                self.otp_error = _friendly_auth_error(e, "verification")
+        finally:
+            self.otp_loading = False
+
+    @rx.event
+    def resend_otp_code(self):
+        email = (self.otp_email or self.login_email or self.signup_email).strip()
+        if not email:
+            self.otp_error = "Email address is missing."
+            return
+        sb = get_supabase()
+        if sb is None:
+            self.otp_error = "Authentication service is not configured."
+            return
+        self.otp_loading = True
+        self.otp_error = ""
+        try:
+            otp_type = self.otp_type or "signup"
+            sb.auth.resend({
+                "type": otp_type,
+                "email": email,
+            })
+            self.auth_success = f"A new verification code has been sent to {email}."
+        except Exception as e:
+            try:
+                sb.auth.sign_in_with_otp({"email": email})
+                self.auth_success = f"A new verification code has been sent to {email}."
+            except Exception as e2:
+                logging.exception(f"Resend OTP error: {e2}")
+                self.otp_error = _friendly_auth_error(e2, "resend code")
+        finally:
+            self.otp_loading = False
 
     @rx.event
     def login_with_google(self):
@@ -564,6 +729,13 @@ class AuthState(rx.State):
                 }
             )
             if resp and resp.user:
+                if not resp.session:
+                    self.otp_email = self.signup_email
+                    self.otp_type = "signup"
+                    self.show_otp_view = True
+                    self.auth_success = f"Account created! We've sent a 6-digit confirmation code to {self.signup_email}."
+                    self.loading = False
+                    return
                 self._apply_user_session(
                     resp.user,
                     resp.session,
@@ -609,6 +781,12 @@ class AuthState(rx.State):
         self.auth_success = ""
         self.loading = False
         self.google_loading = False
+        self.show_otp_view = False
+        self.otp_email = ""
+        self.otp_code = ""
+        self.otp_error = ""
+        self.otp_success = ""
+        self.otp_loading = False
         self.forgot_loading = False
         self.forgot_email = ""
         self.forgot_error = ""

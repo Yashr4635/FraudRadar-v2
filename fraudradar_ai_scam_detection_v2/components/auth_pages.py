@@ -467,126 +467,228 @@ def forgot_password_modal() -> rx.Component:
     )
 
 
+def otp_verification_card() -> rx.Component:
+    return rx.el.div(
+        rx.el.div(
+            rx.icon("mail-check", class_name="h-6 w-6 text-white"),
+            class_name="h-12 w-12 rounded-2xl bg-gradient-to-br from-[#E8471A] to-[#c43a13] flex items-center justify-center shadow-lg shadow-orange-300/40 mb-4 mx-auto",
+        ),
+        rx.el.h2("Verify Your Email", class_name="text-2xl font-bold text-gray-900 tracking-tight text-center"),
+        rx.el.p(
+            "Enter the 6-digit confirmation code sent to ",
+            rx.el.span(AuthState.otp_email, class_name="font-semibold text-gray-900"),
+            ".",
+            class_name="text-sm text-gray-500 mt-1 leading-relaxed text-center",
+        ),
+        rx.cond(
+            AuthState.otp_error != "",
+            rx.el.div(
+                rx.icon("circle-alert", class_name="h-4 w-4 text-red-600 shrink-0"),
+                rx.el.p(AuthState.otp_error, class_name="text-xs text-red-700 font-medium"),
+                class_name="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 mt-4",
+            ),
+            rx.fragment(),
+        ),
+        rx.cond(
+            AuthState.auth_success != "",
+            rx.el.div(
+                rx.icon("circle-check", class_name="h-4 w-4 text-green-600 shrink-0"),
+                rx.el.p(AuthState.auth_success, class_name="text-xs text-green-700 font-medium"),
+                class_name="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 mt-4",
+            ),
+            rx.fragment(),
+        ),
+        rx.el.div(
+            rx.el.label(
+                "6-Digit Verification Code",
+                class_name="block text-xs font-semibold text-gray-700 mb-1.5 tracking-wide text-center",
+            ),
+            rx.el.div(
+                rx.icon(
+                    "key-round",
+                    class_name="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-[#E8471A] transition-colors",
+                ),
+                rx.el.input(
+                    type="text",
+                    placeholder="123456",
+                    max_length=8,
+                    default_value=AuthState.otp_code,
+                    on_change=AuthState.set_otp_code,
+                    class_name="w-full pl-11 pr-3 py-3 rounded-xl border border-gray-200 bg-gray-50/60 text-lg font-mono tracking-widest text-gray-900 placeholder-gray-400 focus:outline-hidden focus:ring-4 focus:ring-orange-500/15 focus:border-[#E8471A] focus:bg-white transition-all text-center",
+                ),
+                class_name="group relative",
+            ),
+            class_name="mt-5",
+        ),
+        rx.el.button(
+            rx.cond(
+                AuthState.otp_loading,
+                rx.fragment(
+                    rx.icon("loader-circle", class_name="h-4 w-4 animate-spin"),
+                    rx.el.span("Verifying Code..."),
+                ),
+                rx.fragment(
+                    rx.icon("shield-check", class_name="h-4 w-4"),
+                    rx.el.span("Verify & Sign In"),
+                ),
+            ),
+            type="button",
+            on_click=AuthState.verify_email_otp,
+            disabled=AuthState.otp_loading,
+            class_name="w-full mt-5 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#E8471A] to-[#c43a13] hover:from-[#c43a13] hover:to-[#a82e0d] text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-300/50 hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-60 disabled:cursor-not-allowed",
+        ),
+        rx.el.div(
+            rx.el.button(
+                "Didn't receive code? Resend",
+                type="button",
+                on_click=AuthState.resend_otp_code,
+                disabled=AuthState.otp_loading,
+                class_name="text-xs text-[#E8471A] font-semibold hover:underline",
+            ),
+            rx.el.span("·", class_name="text-gray-300"),
+            rx.el.button(
+                "Back / Change Email",
+                type="button",
+                on_click=AuthState.cancel_otp_view,
+                class_name="text-xs text-gray-500 hover:text-gray-800",
+            ),
+            class_name="flex items-center justify-center gap-2 mt-4",
+        ),
+        class_name="w-full",
+    )
+
+
 def login_page() -> rx.Component:
     return rx.el.div(
         forgot_password_modal(),
         login_marketing_panel(),
         rx.el.div(
             rx.el.div(
-                rx.el.div(
-                    rx.el.div(
-                        rx.icon("shield-check", class_name="h-5 w-5 text-white"),
-                        class_name="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#E8471A] to-[#c43a13] flex items-center justify-center lg:hidden shadow-lg shadow-orange-200/60",
-                    ),
-                    rx.el.div(
-                        rx.el.p("FraudRadar", class_name="text-sm font-bold text-gray-900 lg:hidden"),
-                        rx.el.p("Scam Defense AI", class_name="text-[10px] text-gray-500 font-medium lg:hidden"),
-                    ),
-                    class_name="flex items-center gap-3 lg:hidden mb-8",
-                ),
-                rx.el.div(
-                    rx.el.div(
-                        rx.el.div(class_name="h-2 w-2 rounded-full bg-green-500 animate-pulse"),
-                        rx.el.span("All systems secure", class_name="text-[11px] font-semibold text-green-700"),
-                        class_name="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 w-fit mb-4",
-                    ),
-                    rx.el.h1(
-                        rx.el.span("Welcome Back ", class_name="text-gray-900"),
-                        rx.el.span("👋"),
-                        class_name="text-3xl font-extrabold tracking-tight",
-                    ),
-                    rx.el.p(
-                        "Continue protecting yourself with AI-powered scam detection.",
-                        class_name="text-sm text-gray-500 mt-2 leading-relaxed",
-                    ),
-                    class_name="mb-7",
-                ),
-                message_alert(),
-                google_auth_button("Continue with Google"),
-                auth_divider("or continue with email"),
-                _login_input(
-                    "Email Address",
-                    "you@example.com",
-                    AuthState.login_email,
-                    AuthState.set_login_email,
-                    "mail",
-                    "email",
-                ),
-                rx.el.div(
-                    rx.el.label("Password", class_name="block text-xs font-semibold text-gray-700 mb-1.5 tracking-wide"),
-                    rx.el.div(
-                        rx.icon(
-                            "lock",
-                            class_name="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-[#E8471A] transition-colors",
+                rx.cond(
+                    AuthState.show_otp_view,
+                    otp_verification_card(),
+                    rx.fragment(
+                        rx.el.div(
+                            rx.el.div(
+                                rx.icon("shield-check", class_name="h-5 w-5 text-white"),
+                                class_name="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#E8471A] to-[#c43a13] flex items-center justify-center lg:hidden shadow-lg shadow-orange-200/60",
+                            ),
+                            rx.el.div(
+                                rx.el.p("FraudRadar", class_name="text-sm font-bold text-gray-900 lg:hidden"),
+                                rx.el.p("Scam Defense AI", class_name="text-[10px] text-gray-500 font-medium lg:hidden"),
+                            ),
+                            class_name="flex items-center gap-3 lg:hidden mb-8",
                         ),
-                        rx.el.input(
-                            type=rx.cond(AuthState.show_login_password, "text", "password"),
-                            placeholder="Enter your password",
-                            default_value=AuthState.login_password,
-                            on_change=AuthState.set_login_password.debounce(200),
-                            class_name="w-full pl-11 pr-11 py-3 rounded-xl border border-gray-200 bg-gray-50/60 text-sm text-gray-900 placeholder-gray-400 focus:outline-hidden focus:ring-4 focus:ring-orange-500/15 focus:border-[#E8471A] focus:bg-white transition-all",
+                        rx.el.div(
+                            rx.el.div(
+                                rx.el.div(class_name="h-2 w-2 rounded-full bg-green-500 animate-pulse"),
+                                rx.el.span("All systems secure", class_name="text-[11px] font-semibold text-green-700"),
+                                class_name="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 w-fit mb-4",
+                            ),
+                            rx.el.h1(
+                                rx.el.span("Welcome Back ", class_name="text-gray-900"),
+                                rx.el.span("👋"),
+                                class_name="text-3xl font-extrabold tracking-tight",
+                            ),
+                            rx.el.p(
+                                "Continue protecting yourself with AI-powered scam detection.",
+                                class_name="text-sm text-gray-500 mt-2 leading-relaxed",
+                            ),
+                            class_name="mb-7",
+                        ),
+                        message_alert(),
+                        _login_input(
+                            "Email Address",
+                            "you@example.com",
+                            AuthState.login_email,
+                            AuthState.set_login_email,
+                            "mail",
+                            "email",
+                        ),
+                        rx.el.div(
+                            rx.el.label("Password", class_name="block text-xs font-semibold text-gray-700 mb-1.5 tracking-wide"),
+                            rx.el.div(
+                                rx.icon(
+                                    "lock",
+                                    class_name="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-[#E8471A] transition-colors",
+                                ),
+                                rx.el.input(
+                                    type=rx.cond(AuthState.show_login_password, "text", "password"),
+                                    placeholder="Enter your password",
+                                    default_value=AuthState.login_password,
+                                    on_change=AuthState.set_login_password.debounce(200),
+                                    class_name="w-full pl-11 pr-11 py-3 rounded-xl border border-gray-200 bg-gray-50/60 text-sm text-gray-900 placeholder-gray-400 focus:outline-hidden focus:ring-4 focus:ring-orange-500/15 focus:border-[#E8471A] focus:bg-white transition-all",
+                                ),
+                                rx.el.button(
+                                    rx.icon(
+                                        rx.cond(AuthState.show_login_password, "eye-off", "eye"),
+                                        class_name="h-4 w-4",
+                                    ),
+                                    type="button",
+                                    on_click=AuthState.toggle_login_password,
+                                    class_name="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md text-gray-400 hover:text-[#E8471A] hover:bg-orange-50 flex items-center justify-center transition-colors",
+                                ),
+                                class_name="group relative",
+                            ),
+                            class_name="mt-4",
+                        ),
+                        rx.el.div(
+                            rx.el.label(
+                                rx.el.input(
+                                    type="checkbox",
+                                    checked=AuthState.remember_me,
+                                    on_change=AuthState.toggle_remember_me,
+                                    class_name="h-3.5 w-3.5 rounded border-gray-300 text-[#E8471A] focus:ring-[#E8471A]",
+                                ),
+                                rx.el.span("Remember me", class_name="text-xs text-gray-600 font-medium"),
+                                class_name="flex items-center gap-2 cursor-pointer",
+                            ),
+                            rx.el.button(
+                                "Forgot password?",
+                                type="button",
+                                on_click=AuthState.open_forgot_modal,
+                                class_name="text-xs text-[#E8471A] font-semibold hover:underline",
+                            ),
+                            class_name="flex items-center justify-between mt-3",
                         ),
                         rx.el.button(
-                            rx.icon(
-                                rx.cond(AuthState.show_login_password, "eye-off", "eye"),
-                                class_name="h-4 w-4",
+                            rx.cond(
+                                AuthState.loading,
+                                rx.fragment(
+                                    rx.icon("loader-circle", class_name="h-4 w-4 animate-spin"),
+                                    rx.el.span("Signing in..."),
+                                ),
+                                rx.fragment(
+                                    rx.icon("log-in", class_name="h-4 w-4"),
+                                    rx.el.span("Sign in to FraudRadar"),
+                                    rx.icon("arrow-right", class_name="h-4 w-4 transition-transform group-hover:translate-x-0.5"),
+                                ),
                             ),
+                            on_click=AuthState.login,
+                            disabled=AuthState.loading,
+                            class_name="group w-full mt-6 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#E8471A] to-[#c43a13] hover:from-[#c43a13] hover:to-[#a82e0d] text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-300/50 hover:shadow-xl hover:shadow-orange-400/50 hover:-translate-y-0.5 active:translate-y-0 focus:outline-hidden focus:ring-4 focus:ring-orange-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0",
+                        ),
+                        rx.el.button(
+                            rx.icon("mail", class_name="h-3.5 w-3.5 text-[#E8471A]"),
+                            rx.el.span("Sign in with 6-digit email OTP instead"),
                             type="button",
-                            on_click=AuthState.toggle_login_password,
-                            class_name="absolute right-3 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md text-gray-400 hover:text-[#E8471A] hover:bg-orange-50 flex items-center justify-center transition-colors",
+                            on_click=AuthState.open_otp_login,
+                            class_name="w-full mt-3 inline-flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-[#E8471A] hover:bg-orange-50/70 rounded-xl border border-orange-200/60 transition-all",
                         ),
-                        class_name="group relative",
-                    ),
-                    class_name="mt-4",
-                ),
-                rx.el.div(
-                    rx.el.label(
-                        rx.el.input(
-                            type="checkbox",
-                            checked=AuthState.remember_me,
-                            on_change=AuthState.toggle_remember_me,
-                            class_name="h-3.5 w-3.5 rounded border-gray-300 text-[#E8471A] focus:ring-[#E8471A]",
+                        rx.el.div(
+                            rx.icon("shield-check", class_name="h-3.5 w-3.5 text-green-600"),
+                            rx.el.span(
+                                "Your login is encrypted and protected.",
+                                class_name="text-[11px] text-gray-600 font-medium",
+                            ),
+                            class_name="flex items-center justify-center gap-1.5 mt-3 px-3 py-2 rounded-lg bg-green-50/60 border border-green-100",
                         ),
-                        rx.el.span("Remember me", class_name="text-xs text-gray-600 font-medium"),
-                        class_name="flex items-center gap-2 cursor-pointer",
-                    ),
-                    rx.el.button(
-                        "Forgot password?",
-                        type="button",
-                        on_click=AuthState.open_forgot_modal,
-                        class_name="text-xs text-[#E8471A] font-semibold hover:underline",
-                    ),
-                    class_name="flex items-center justify-between mt-3",
-                ),
-                rx.el.button(
-                    rx.cond(
-                        AuthState.loading,
-                        rx.fragment(
-                            rx.icon("loader-circle", class_name="h-4 w-4 animate-spin"),
-                            rx.el.span("Signing in..."),
-                        ),
-                        rx.fragment(
-                            rx.icon("log-in", class_name="h-4 w-4"),
-                            rx.el.span("Sign in to FraudRadar"),
-                            rx.icon("arrow-right", class_name="h-4 w-4 transition-transform group-hover:translate-x-0.5"),
+                        rx.el.p(
+                            "Don't have an account? ",
+                            rx.el.a("Create one free", href="/signup", class_name="text-[#E8471A] font-bold hover:underline"),
+                            class_name="text-sm text-gray-600 text-center mt-6",
                         ),
                     ),
-                    on_click=AuthState.login,
-                    disabled=AuthState.loading,
-                    class_name="group w-full mt-6 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#E8471A] to-[#c43a13] hover:from-[#c43a13] hover:to-[#a82e0d] text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-orange-300/50 hover:shadow-xl hover:shadow-orange-400/50 hover:-translate-y-0.5 active:translate-y-0 focus:outline-hidden focus:ring-4 focus:ring-orange-500/30 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0",
-                ),
-                rx.el.div(
-                    rx.icon("shield-check", class_name="h-3.5 w-3.5 text-green-600"),
-                    rx.el.span(
-                        "Your login is encrypted and protected.",
-                        class_name="text-[11px] text-gray-600 font-medium",
-                    ),
-                    class_name="flex items-center justify-center gap-1.5 mt-3 px-3 py-2 rounded-lg bg-green-50/60 border border-green-100",
-                ),
-                rx.el.p(
-                    "Don't have an account? ",
-                    rx.el.a("Create one free", href="/signup", class_name="text-[#E8471A] font-bold hover:underline"),
-                    class_name="text-sm text-gray-600 text-center mt-6",
                 ),
                 class_name="relative bg-white border border-gray-100 rounded-[18px] shadow-[0_8px_40px_-12px_rgba(232,71,26,0.15)] p-7 sm:p-9 w-full max-w-md",
             ),
@@ -612,70 +714,74 @@ def signup_page() -> rx.Component:
         marketing_panel(),
         rx.el.div(
             rx.el.div(
-                rx.el.div(
-                    rx.el.h1("Create your account", class_name="text-2xl font-bold text-gray-900"),
-                    rx.el.p("Join thousands staying scam-free.", class_name="text-sm text-gray-500 mt-1"),
-                    class_name="mb-8",
-                ),
-                message_alert(),
-                google_auth_button("Sign up with Google"),
-                auth_divider("or register with email"),
-                auth_input("Full Name", "name", AuthState.signup_name, "Your name", "text", AuthState.set_signup_name, "user"),
-                rx.el.div(
-                    auth_input("Email", "email", AuthState.signup_email, "you@example.com", "email", AuthState.set_signup_email, "mail"),
-                    class_name="mt-4",
-                ),
-                rx.el.div(
-                    rx.el.label("Password", class_name="block text-sm font-medium text-gray-700 mb-1.5"),
-                    rx.el.div(
-                        rx.icon("lock", class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"),
-                        rx.el.input(
-                            type=rx.cond(AuthState.show_signup_password, "text", "password"),
-                            placeholder="At least 6 characters",
-                            default_value=AuthState.signup_password,
-                            on_change=AuthState.set_signup_password.debounce(200),
-                            class_name="w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A] focus:border-transparent",
+                rx.cond(
+                    AuthState.show_otp_view,
+                    otp_verification_card(),
+                    rx.fragment(
+                        rx.el.div(
+                            rx.el.h1("Create your account", class_name="text-2xl font-bold text-gray-900"),
+                            rx.el.p("Join thousands staying scam-free.", class_name="text-sm text-gray-500 mt-1"),
+                            class_name="mb-8",
+                        ),
+                        message_alert(),
+                        auth_input("Full Name", "name", AuthState.signup_name, "Your name", "text", AuthState.set_signup_name, "user"),
+                        rx.el.div(
+                            auth_input("Email", "email", AuthState.signup_email, "you@example.com", "email", AuthState.set_signup_email, "mail"),
+                            class_name="mt-4",
+                        ),
+                        rx.el.div(
+                            rx.el.label("Password", class_name="block text-sm font-medium text-gray-700 mb-1.5"),
+                            rx.el.div(
+                                rx.icon("lock", class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"),
+                                rx.el.input(
+                                    type=rx.cond(AuthState.show_signup_password, "text", "password"),
+                                    placeholder="At least 6 characters",
+                                    default_value=AuthState.signup_password,
+                                    on_change=AuthState.set_signup_password.debounce(200),
+                                    class_name="w-full pl-10 pr-10 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A] focus:border-transparent",
+                                ),
+                                rx.el.button(
+                                    rx.icon(rx.cond(AuthState.show_signup_password, "eye-off", "eye"), class_name="h-4 w-4"),
+                                    type="button",
+                                    on_click=AuthState.toggle_signup_password,
+                                    class_name="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600",
+                                ),
+                                class_name="relative",
+                            ),
+                            class_name="mt-4",
+                        ),
+                        rx.el.div(
+                            auth_input("Confirm Password", "confirm", AuthState.signup_confirm, "Re-enter password", "password", AuthState.set_signup_confirm, "lock"),
+                            class_name="mt-4",
+                        ),
+                        rx.el.label(
+                            rx.el.input(
+                                type="checkbox",
+                                checked=AuthState.accept_terms,
+                                on_change=AuthState.toggle_terms,
+                                class_name="h-4 w-4 rounded border-gray-300 text-[#E8471A] focus:ring-[#E8471A]",
+                            ),
+                            rx.el.span(
+                                "I agree to the ",
+                                rx.el.a("Terms", href="/legal", class_name="text-[#E8471A] hover:underline"),
+                                " and ",
+                                rx.el.a("Privacy Policy", href="/legal", class_name="text-[#E8471A] hover:underline"),
+                                class_name="text-sm text-gray-600",
+                            ),
+                            class_name="flex items-start gap-2 mt-5 cursor-pointer",
                         ),
                         rx.el.button(
-                            rx.icon(rx.cond(AuthState.show_signup_password, "eye-off", "eye"), class_name="h-4 w-4"),
-                            type="button",
-                            on_click=AuthState.toggle_signup_password,
-                            class_name="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600",
+                            rx.cond(AuthState.loading, "Creating account...", "Create account"),
+                            on_click=AuthState.signup,
+                            disabled=AuthState.loading,
+                            class_name="w-full mt-6 bg-[#E8471A] text-white py-2.5 rounded-lg font-medium hover:bg-[#c43a13] focus:outline-hidden focus:ring-2 focus:ring-[#E8471A] focus:ring-offset-2 transition-colors disabled:opacity-50",
                         ),
-                        class_name="relative",
+                        rx.el.p(
+                            "Already have an account? ",
+                            rx.el.a("Sign in", href="/login", class_name="text-[#E8471A] font-medium hover:underline"),
+                            class_name="text-sm text-gray-600 text-center mt-6",
+                        ),
                     ),
-                    class_name="mt-4",
-                ),
-                rx.el.div(
-                    auth_input("Confirm Password", "confirm", AuthState.signup_confirm, "Re-enter password", "password", AuthState.set_signup_confirm, "lock"),
-                    class_name="mt-4",
-                ),
-                rx.el.label(
-                    rx.el.input(
-                        type="checkbox",
-                        checked=AuthState.accept_terms,
-                        on_change=AuthState.toggle_terms,
-                        class_name="h-4 w-4 rounded border-gray-300 text-[#E8471A] focus:ring-[#E8471A]",
-                    ),
-                    rx.el.span(
-                        "I agree to the ",
-                        rx.el.a("Terms", href="/legal", class_name="text-[#E8471A] hover:underline"),
-                        " and ",
-                        rx.el.a("Privacy Policy", href="/legal", class_name="text-[#E8471A] hover:underline"),
-                        class_name="text-sm text-gray-600",
-                    ),
-                    class_name="flex items-start gap-2 mt-5 cursor-pointer",
-                ),
-                rx.el.button(
-                    rx.cond(AuthState.loading, "Creating account...", "Create account"),
-                    on_click=AuthState.signup,
-                    disabled=AuthState.loading,
-                    class_name="w-full mt-6 bg-[#E8471A] text-white py-2.5 rounded-lg font-medium hover:bg-[#c43a13] focus:outline-hidden focus:ring-2 focus:ring-[#E8471A] focus:ring-offset-2 transition-colors disabled:opacity-50",
-                ),
-                rx.el.p(
-                    "Already have an account? ",
-                    rx.el.a("Sign in", href="/login", class_name="text-[#E8471A] font-medium hover:underline"),
-                    class_name="text-sm text-gray-600 text-center mt-6",
                 ),
                 class_name="w-full max-w-sm",
             ),
