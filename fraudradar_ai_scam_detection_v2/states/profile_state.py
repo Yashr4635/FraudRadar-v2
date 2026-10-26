@@ -94,51 +94,63 @@ class ProfileState(rx.State):
     @rx.event
     def toggle_email_notif(self):
         self.notifications_email = not self.notifications_email
+        return rx.toast.success("Email alerts updated.")
 
     @rx.event
     def toggle_sms_notif(self):
         self.notifications_sms = not self.notifications_sms
+        return rx.toast.success("SMS alerts updated.")
 
     @rx.event
     def toggle_push_notif(self):
         self.notifications_push = not self.notifications_push
+        return rx.toast.success("Push notifications updated.")
 
     @rx.event
     def toggle_weekly(self):
         self.weekly_report = not self.weekly_report
+        return rx.toast.success("Weekly safety report updated.")
 
     @rx.event
     def toggle_high_risk(self):
         self.high_risk_alerts = not self.high_risk_alerts
+        return rx.toast.success("High-risk alerts updated.")
 
     @rx.event
     def toggle_scam_news(self):
         self.scam_news = not self.scam_news
+        return rx.toast.success("Trending scam news updated.")
 
     @rx.event
     def toggle_2fa(self):
         self.two_factor_enabled = not self.two_factor_enabled
-        self.save_message = (
+        msg = (
             "Two-factor authentication enabled."
             if self.two_factor_enabled
             else "Two-factor authentication disabled."
         )
+        self.save_message = msg
+        return rx.toast.success(msg)
 
     @rx.event
     def toggle_biometric(self):
         self.biometric_enabled = not self.biometric_enabled
+        return rx.toast.info("Biometric preference updated.")
 
     @rx.event
     def toggle_data_sharing(self):
         self.data_sharing = not self.data_sharing
+        return rx.toast.info("Scam pattern sharing updated.")
 
     @rx.event
     def toggle_analytics(self):
         self.analytics_opt_in = not self.analytics_opt_in
+        return rx.toast.info("Anonymous analytics preference updated.")
 
     @rx.event
     def toggle_public_profile(self):
         self.public_profile = not self.public_profile
+        return rx.toast.info("Public profile badge updated.")
 
     @rx.event
     def set_confirm_delete(self, v: str):

@@ -55,6 +55,16 @@ class UploadState(rx.State):
         self.upload_success = ""
 
     @rx.event
+    def clear_upload(self):
+        self.upload_error = ""
+        self.upload_success = ""
+        self.extracted_text = ""
+        self.decoded_qr_value = ""
+        self.last_screenshot_file = ""
+        self.last_qr_file = ""
+        self.is_processing = False
+
+    @rx.event
     async def handle_screenshot_upload(self, files: list[rx.UploadFile]):
         from fraudradar_ai_scam_detection_v2.states.scan_state import ScanState
 

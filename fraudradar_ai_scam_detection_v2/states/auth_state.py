@@ -1,12 +1,16 @@
 import os
 import logging
 import datetime
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 import reflex as rx
 
 import secrets
 import hashlib
 import base64
+
+_PROFILE_EXECUTOR = ThreadPoolExecutor(max_workers=2)
 
 def generate_pkce_pair():
     code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b'=').decode()
@@ -230,6 +234,9 @@ def get_supabase():
     return None
 
 
+_AUTH_TOKEN_CACHE: dict[str, tuple[any, float]] = {}
+
+
 class AuthState(rx.State):
     is_authenticated: bool = False
     user_id: str = ""
@@ -238,8 +245,8 @@ class AuthState(rx.State):
     user_avatar_url: str = ""
     user_provider: str = "email"
     last_login_at: str = ""
-    access_token: str = ""
-    refresh_token: str = ""
+    access_token: str = rx.LocalStorage("")
+    refresh_token: str = rx.LocalStorage("")
     auth_error: str = ""
     auth_success: str = ""
     _code_verifier: str = ""
@@ -250,6 +257,7 @@ class AuthState(rx.State):
     login_email: str = ""
     login_password: str = ""
     show_login_password: bool = False
+    show_password_login: bool = False
 
     signup_name: str = ""
     signup_email: str = ""
@@ -277,10 +285,30 @@ class AuthState(rx.State):
     show_otp_view: bool = False
     otp_email: str = ""
     otp_code: str = ""
-    otp_type: str = "signup"
+    otp_type: str = "email"
     otp_loading: bool = False
     otp_error: str = ""
     otp_success: str = ""
+    resend_cooldown: int = 0
+    can_resend: bool = True
+
+    @rx.event
+    def toggle_password_login(self):
+        self.show_password_login = not self.show_password_login
+        self.auth_error = ""
+        self.auth_success = ""
+
+    @rx.event(background=True)
+    async def start_resend_countdown(self):
+        async with self:
+            self.can_resend = False
+            self.resend_cooldown = 60
+        for remaining in range(59, -1, -1):
+            await asyncio.sleep(1)
+            async with self:
+                self.resend_cooldown = remaining
+                if remaining == 0:
+                    self.can_resend = True
 
     @rx.event
     def set_login_email(self, v: str):
@@ -428,12 +456,18 @@ class AuthState(rx.State):
         self.change_password_loading = False
 
     @rx.event
-    def login(self):
+    def login(self, form_data: dict = None):
         if self.loading:
             return
+        if form_data and isinstance(form_data, dict):
+            if form_data.get("email"):
+                self.login_email = str(form_data.get("email")).strip()
+            if form_data.get("password"):
+                self.login_password = str(form_data.get("password"))
         self.auth_error = ""
         self.auth_success = ""
-        if not self.login_email or "@" not in self.login_email:
+        email = (self.login_email or "").strip().lower()
+        if not email or "@" not in email:
             self.auth_error = "Please enter a valid email address."
             return
         if len(self.login_password) < 6:
@@ -449,7 +483,7 @@ class AuthState(rx.State):
         self.loading = True
         try:
             resp = sb.auth.sign_in_with_password(
-                {"email": self.login_email, "password": self.login_password}
+                {"email": email, "password": self.login_password}
             )
             if resp and resp.user:
                 self._apply_user_session(resp.user, resp.session, "email")
@@ -462,13 +496,13 @@ class AuthState(rx.State):
         except Exception as e:
             msg = str(e).lower()
             if "not confirmed" in msg or "email not confirmed" in msg:
-                self.otp_email = self.login_email
+                self.otp_email = email
                 self.otp_type = "signup"
                 self.show_otp_view = True
                 self.auth_error = ""
-                self.auth_success = f"Please enter the verification code sent to {self.login_email} to activate your account."
+                self.auth_success = f"Please enter the verification code sent to {email} to activate your account."
                 self.loading = False
-                return
+                return AuthState.start_resend_countdown
             if _is_expected_auth_error(e):
                 logging.warning(
                     f"Expected auth validation/rate-limit in login: {e}"
@@ -494,7 +528,7 @@ class AuthState(rx.State):
 
     @rx.event
     def open_otp_login(self):
-        email = (self.login_email or "").strip()
+        email = (self.login_email or "").strip().lower()
         if not email or "@" not in email:
             self.auth_error = "Please enter your email address first."
             return
@@ -503,9 +537,13 @@ class AuthState(rx.State):
         return self.send_login_otp()
 
     @rx.event
-    def send_login_otp(self):
-        email = (self.otp_email or self.login_email).strip()
-        if not email or "@" not in email:
+    def send_login_otp(self, form_data: dict = None):
+        if form_data and isinstance(form_data, dict):
+            raw_email = form_data.get("email")
+            if raw_email:
+                self.login_email = str(raw_email).strip()
+        email = (self.otp_email or self.login_email).strip().lower()
+        if not email or "@" not in email or "." not in email:
             self.auth_error = "Please enter a valid email address."
             return
         sb = get_supabase()
@@ -519,27 +557,49 @@ class AuthState(rx.State):
         try:
             sb.auth.sign_in_with_otp({
                 "email": email,
+                "options": {
+                    "should_create_user": False
+                }
             })
             self.otp_email = email
             self.otp_type = "email"
             self.show_otp_view = True
-            self.auth_success = f"Verification code sent to {email}. Please enter the 6-digit code below."
+            self.otp_code = ""
+            self.auth_success = f"Verification code sent to {email}. Please enter the 8-digit code below."
+            return AuthState.start_resend_countdown
         except Exception as e:
             logging.exception(f"Send OTP error: {e}")
-            self.auth_error = _friendly_auth_error(e, "send verification code")
+            msg = str(e).lower()
+            if "signups not allowed" in msg or "not found" in msg or "user not found" in msg:
+                self.auth_error = "No account found with this email. Please create an account first."
+            else:
+                self.auth_error = _friendly_auth_error(e, "send verification code")
         finally:
             self.otp_loading = False
 
     @rx.event
-    def verify_email_otp(self):
+    def verify_email_otp(self, form_data: dict = None):
+        if self.otp_loading:
+            return
+        if form_data and isinstance(form_data, dict):
+            raw_code = form_data.get("otp_code")
+            if raw_code:
+                self.otp_code = str(raw_code).strip()
         code = self.otp_code.strip()
-        email = (self.otp_email or self.login_email or self.signup_email).strip()
+        email = (self.otp_email or self.login_email or self.signup_email).strip().lower()
+        if not email or "@" not in email:
+            self.otp_error = "Email address missing. Please go back and enter your email."
+            return
         if not code:
-            self.otp_error = "Please enter the verification code."
+            self.otp_error = "Please enter the 8-digit verification code."
             return
-        if not email:
-            self.otp_error = "Email address missing. Please go back and try again."
+        import re as _re
+        clean_code = _re.sub(r"\D", "", code)
+        if len(clean_code) < 4 or len(clean_code) > 12:
+            self.otp_error = "Please enter a valid verification code (8 digits)."
             return
+        code = clean_code
+
         sb = get_supabase()
         if sb is None:
             self.otp_error = "Authentication service is not configured."
@@ -547,31 +607,36 @@ class AuthState(rx.State):
         self.otp_loading = True
         self.otp_error = ""
         try:
-            primary_type = self.otp_type or "signup"
-            secondary_type = "email" if primary_type == "signup" else "signup"
+            candidate_types = [self.otp_type] if self.otp_type else []
+            for t in ["email", "magiclink", "signup"]:
+                if t not in candidate_types:
+                    candidate_types.append(t)
+            
             result = None
-            try:
-                result = sb.auth.verify_otp({
-                    "email": email,
-                    "token": code,
-                    "type": primary_type,
-                })
-            except Exception as e1:
-                logging.info(f"verify_otp {primary_type} failed: {e1}, trying {secondary_type}")
+            last_err = None
+            for ot in candidate_types:
                 try:
                     result = sb.auth.verify_otp({
                         "email": email,
                         "token": code,
-                        "type": secondary_type,
+                        "type": ot,
                     })
-                except Exception:
-                    raise e1
+                    if result and getattr(result, "user", None):
+                        break
+                except Exception as ex:
+                    last_err = ex
+                    continue
 
-            if result and result.user:
-                provider = self._extract_provider(result.user)
+            if (not result or not getattr(result, "user", None)) and last_err:
+                raise last_err
+
+            if result and getattr(result, "user", None):
+                user = result.user
+                session = getattr(result, "session", None)
+                provider = self._extract_provider(user)
                 self._apply_user_session(
-                    result.user,
-                    result.session,
+                    user,
+                    session,
                     provider,
                     fallback_name=self.signup_name,
                 )
@@ -594,7 +659,9 @@ class AuthState(rx.State):
 
     @rx.event
     def resend_otp_code(self):
-        email = (self.otp_email or self.login_email or self.signup_email).strip()
+        if not self.can_resend or self.otp_loading:
+            return
+        email = (self.otp_email or self.login_email or self.signup_email).strip().lower()
         if not email:
             self.otp_error = "Email address is missing."
             return
@@ -605,19 +672,25 @@ class AuthState(rx.State):
         self.otp_loading = True
         self.otp_error = ""
         try:
-            otp_type = self.otp_type or "signup"
-            sb.auth.resend({
-                "type": otp_type,
-                "email": email,
-            })
-            self.auth_success = f"A new verification code has been sent to {email}."
+            otp_type = self.otp_type or "email"
+            if otp_type == "signup":
+                try:
+                    sb.auth.resend({
+                        "type": "signup",
+                        "email": email,
+                    })
+                except Exception:
+                    sb.auth.sign_in_with_otp({"email": email})
+            else:
+                sb.auth.sign_in_with_otp({
+                    "email": email,
+                    "options": {"should_create_user": False}
+                })
+            self.auth_success = f"A new 8-digit verification code has been sent to {email}."
+            return AuthState.start_resend_countdown
         except Exception as e:
-            try:
-                sb.auth.sign_in_with_otp({"email": email})
-                self.auth_success = f"A new verification code has been sent to {email}."
-            except Exception as e2:
-                logging.exception(f"Resend OTP error: {e2}")
-                self.otp_error = _friendly_auth_error(e2, "resend code")
+            logging.exception(f"Resend OTP error: {e}")
+            self.otp_error = _friendly_auth_error(e, "resend code")
         finally:
             self.otp_loading = False
 
@@ -727,7 +800,7 @@ class AuthState(rx.State):
                     self.otp_email = self.signup_email
                     self.otp_type = "signup"
                     self.show_otp_view = True
-                    self.auth_success = f"Account created! We've sent a 6-digit confirmation code to {self.signup_email}."
+                    self.auth_success = f"Account created! We've sent an 8-digit confirmation code to {self.signup_email}."
                     self.loading = False
                     return
                 self._apply_user_session(
@@ -762,6 +835,7 @@ class AuthState(rx.State):
                 sb.auth.sign_out()
             except Exception as e:
                 logging.exception(f"Logout error: {e}")
+        _AUTH_TOKEN_CACHE.clear()
         self.is_authenticated = False
         self.user_id = ""
         self.user_email = ""
@@ -803,12 +877,45 @@ class AuthState(rx.State):
         return rx.redirect("/login")
 
     @rx.event
-    def require_auth(self):
+    def redirect_if_authenticated(self):
         if not self.is_authenticated:
-            try:
-                self._restore_session_sync()
-            except Exception as e:
-                logging.exception(f"require_auth restore: {e}")
+            self._restore_session_sync()
+        if self.is_authenticated:
+            return rx.redirect("/dashboard")
+
+    @rx.event
+    def handle_auth_callback_if_present(self):
+        """Called on landing page or login page mount.
+        If user is already authenticated, redirects to dashboard.
+        If a hash with access_token is present in URL, processes the callback."""
+        if self.is_authenticated:
+            return rx.redirect("/dashboard")
+        return rx.call_script(
+            _EXTRACT_AUTH_HASH_JS,
+            callback=AuthState.route_if_token_present,
+        )
+
+    @rx.event
+    def route_if_token_present(self, raw: str):
+        import json as _json
+        try:
+            hash_data = _json.loads(raw) if raw else {}
+        except Exception:
+            hash_data = {}
+        if hash_data.get("access_token") or hash_data.get("error") or hash_data.get("error_code"):
+            return AuthState.process_auth_callback(raw)
+        if not self.is_authenticated:
+            if self._restore_session_sync():
+                return rx.redirect("/dashboard")
+
+    @rx.event
+    def require_auth(self):
+        if self.is_authenticated and self.user_id:
+            return
+        try:
+            self._restore_session_sync()
+        except Exception as e:
+            logging.exception(f"require_auth restore: {e}")
         if not self.is_authenticated:
             return rx.redirect("/login")
 
@@ -1028,11 +1135,61 @@ class AuthState(rx.State):
         return rx.redirect("/login")
 
     def _restore_session_sync(self) -> bool:
-        if self.is_authenticated:
+        if self.is_authenticated and self.user_id:
             return True
+        token = str(self.access_token or "").strip()
+
+        # 1. Fast in-memory token cache lookup (0ms)
+        import time as _time
+        now = _time.time()
+        if token and token in _AUTH_TOKEN_CACHE:
+            cached_user, expiry = _AUTH_TOKEN_CACHE[token]
+            if now < expiry and cached_user:
+                provider = self._extract_provider(cached_user)
+                self._apply_user_session(cached_user, None, provider)
+                return True
+            else:
+                _AUTH_TOKEN_CACHE.pop(token, None)
+
         sb = get_supabase()
         if sb is None:
             return False
+
+        # 2. Verify token stored in rx.LocalStorage
+        if token:
+            try:
+                user_resp = sb.auth.get_user(token)
+                user = getattr(user_resp, "user", None)
+                if user:
+                    _AUTH_TOKEN_CACHE[token] = (user, now + 300)
+                    provider = self._extract_provider(user)
+                    self._apply_user_session(user, None, provider)
+                    self._sync_profile_safe()
+                    return True
+            except Exception as ex1:
+                logging.info(f"get_user with access_token notice: {ex1}, trying refresh")
+                refresh = str(self.refresh_token or "").strip()
+                if refresh:
+                    try:
+                        ref_res = sb.auth.refresh_session(refresh)
+                        if ref_res and getattr(ref_res, "user", None):
+                            new_user = ref_res.user
+                            new_token = getattr(ref_res.session, "access_token", token) if hasattr(ref_res, "session") else token
+                            _AUTH_TOKEN_CACHE[new_token] = (new_user, now + 300)
+                            provider = self._extract_provider(new_user)
+                            self._apply_user_session(new_user, ref_res.session, provider)
+                            self._sync_profile_safe()
+                            return True
+                    except Exception as ex2:
+                        logging.warning(f"refresh_session failed: {ex2}")
+            # Stored token is invalid or expired
+            _AUTH_TOKEN_CACHE.pop(token, None)
+            self.access_token = ""
+            self.refresh_token = ""
+            self.is_authenticated = False
+            return False
+
+        # 2. Check client memory session
         try:
             session_resp = sb.auth.get_session()
             session = getattr(session_resp, "session", None) or session_resp
@@ -1044,10 +1201,7 @@ class AuthState(rx.State):
             if user:
                 provider = self._extract_provider(user)
                 self._apply_user_session(user, session, provider)
-                try:
-                    self._sync_profile_safe()
-                except Exception as e:
-                    logging.exception(f"profile sync (restore): {e}")
+                self._sync_profile_safe()
                 return True
         except Exception as e:
             logging.exception(f"Session restore error: {e}")
@@ -1136,17 +1290,16 @@ class AuthState(rx.State):
             self.user_name = name
             self.user_avatar_url = avatar or ""
             self.user_provider = provider or "email"
-            self.access_token = access or ""
-            self.refresh_token = refresh or ""
-            self.last_login_at = datetime.datetime.utcnow().isoformat()
+            if access:
+                self.access_token = access
+            if refresh:
+                self.refresh_token = refresh
+            self.last_login_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         except Exception as e:
             logging.exception(f"apply session: {e}")
 
     def _sync_profile_safe(self) -> None:
         if not self.is_authenticated or not self.user_id:
-            return
-        sb = get_supabase()
-        if sb is None:
             return
         payload = {
             "id": self.user_id,
@@ -1156,22 +1309,24 @@ class AuthState(rx.State):
             "provider": self.user_provider,
             "last_login_at": self.last_login_at,
         }
-        try:
-            sb.table(PROFILES_TABLE).upsert(payload).execute()
-        except Exception as e:
-            msg = str(e)
-            if "PGRST205" in msg or "Could not find the table" in msg:
-                logging.debug(
-                    f"profiles table not provisioned; skipping sync: {msg[:120]}"
-                )
+        def _bg_task(p):
+            sb = get_supabase()
+            if sb is None:
                 return
             try:
-                sb.table(PROFILES_TABLE).upsert(
-                    {
-                        "id": self.user_id,
-                        "email": self.user_email,
-                        "full_name": self.user_name,
-                    }
-                ).execute()
-            except Exception as e2:
-                logging.exception(f"profile upsert failed: {e2}")
+                sb.table(PROFILES_TABLE).upsert(p).execute()
+            except Exception as e:
+                msg = str(e)
+                if "PGRST205" not in msg and "Could not find the table" not in msg:
+                    try:
+                        sb.table(PROFILES_TABLE).upsert({
+                            "id": p.get("id"),
+                            "email": p.get("email"),
+                            "full_name": p.get("full_name"),
+                        }).execute()
+                    except Exception:
+                        pass
+        try:
+            _PROFILE_EXECUTOR.submit(_bg_task, payload)
+        except Exception as ex:
+            logging.debug(f"profile sync submit notice: {ex}")

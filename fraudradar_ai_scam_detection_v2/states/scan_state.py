@@ -705,10 +705,39 @@ class ScanState(rx.State):
         self.history = []
 
     @rx.event
-    def clear_result(self):
+    async def clear_result(self):
         self.has_result = False
         self.input_text = ""
         self.error = ""
+        try:
+            from fraudradar_ai_scam_detection_v2.states.upload_state import UploadState
+            upload_state = await self.get_state(UploadState)
+            upload_state.clear_upload()
+        except Exception:
+            pass
+        return rx.call_script("""
+            const ids = ['analyze-input-text', 'analyze-input-phone', 'analyze-input-url'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = '';
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+            document.querySelectorAll('textarea').forEach(t => {
+                t.value = '';
+                t.dispatchEvent(new Event('input', { bubbles: true }));
+                t.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            document.querySelectorAll('input').forEach(i => {
+                if (i.placeholder && (i.placeholder.includes('98765') || i.placeholder.includes('example.com') || i.placeholder.includes('bit.ly'))) {
+                    i.value = '';
+                    i.dispatchEvent(new Event('input', { bubbles: true }));
+                    i.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        """)
 
     @rx.event
     def export_csv(self):
@@ -821,6 +850,26 @@ class ScanState(rx.State):
         if self.history:
             return self.history[0]["verdict"]
         return "—"
+
+    @rx.event
+    def start_analysis(self, text: str = "", input_type: str = ""):
+        """Immediate event handler that sets loading states in 0ms and chains analyze."""
+        analysis_text = text if text else self.input_text
+        analysis_type = input_type if input_type else self.input_type
+
+        if not analysis_text.strip():
+            self.error = "Please enter content to analyze."
+            return
+        if len(analysis_text) > 5000:
+            self.error = "Input too long (max 5000 chars)."
+            return
+
+        self.is_analyzing = True
+        self.error = ""
+        self.has_result = False
+        self.input_text = analysis_text
+        self.input_type = analysis_type
+        return ScanState.analyze(analysis_text, analysis_type)
 
     @rx.event
     async def analyze(self, text: str = "", input_type: str = ""):

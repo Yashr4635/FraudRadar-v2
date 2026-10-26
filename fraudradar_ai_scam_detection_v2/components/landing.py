@@ -676,9 +676,10 @@ def landing_nav() -> rx.Component:
     return rx.el.nav(
         rx.el.div(
             rx.el.a(
-                rx.el.div(
-                    rx.icon("shield-check", class_name="h-5 w-5 text-white"),
-                    class_name="h-9 w-9 rounded-lg bg-orange-500 flex items-center justify-center",
+                rx.el.img(
+                    src="/fraudradar_shield.png",
+                    alt="FraudRadar Logo",
+                    class_name="h-9 w-9 rounded-xl shadow-md object-contain bg-slate-900",
                 ),
                 rx.el.div(
                     rx.el.p(

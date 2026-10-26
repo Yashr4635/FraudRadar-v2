@@ -324,11 +324,11 @@ def _input_type_tab(value: str, label: str, icon: str) -> rx.Component:
     return rx.el.button(
         rx.icon(icon, class_name="h-3.5 w-3.5"),
         rx.el.span(label, class_name="text-xs font-semibold"),
-        on_click=lambda: ScanState.set_input_type(value),
+        on_click=ScanState.set_input_type(value),
         class_name=rx.cond(
             ScanState.input_type == value,
-            "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E8471A] text-white shadow-sm",
-            "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-[#E8471A]",
+            "cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E8471A] text-white shadow-sm",
+            "cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-[#E8471A]",
         ),
     )
 
@@ -627,9 +627,10 @@ def analyze_content() -> rx.Component:
                             class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400",
                         ),
                         rx.el.input(
+                            id="analyze-input-phone",
                             placeholder="+91 98765 43210",
-                            default_value=ScanState.input_text,
-                            on_change=ScanState.set_input_text.debounce(300),
+                            value=ScanState.input_text,
+                            on_change=ScanState.set_input_text,
                             class_name="w-full pl-10 pr-3 py-3 rounded-lg border border-gray-300 bg-white text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
                         ),
                         class_name="relative",
@@ -643,18 +644,20 @@ def analyze_content() -> rx.Component:
                             class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400",
                         ),
                         rx.el.input(
+                            id="analyze-input-url",
                             placeholder="https://example.com or bit.ly/abc",
-                            default_value=ScanState.input_text,
-                            on_change=ScanState.set_input_text.debounce(300),
+                            value=ScanState.input_text,
+                            on_change=ScanState.set_input_text,
                             class_name="w-full pl-10 pr-3 py-3 rounded-lg border border-gray-300 bg-white text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
                         ),
                         class_name="relative",
                     ),
                 ),
                 rx.el.textarea(
+                    id="analyze-input-text",
                     placeholder="Paste suspicious SMS, WhatsApp message, email, or text here...",
-                    default_value=ScanState.input_text,
-                    on_change=ScanState.set_input_text.debounce(300),
+                    value=ScanState.input_text,
+                    on_change=ScanState.set_input_text,
                     class_name="w-full min-h-[160px] p-3 rounded-lg border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A] focus:border-transparent",
                 ),
             ),
@@ -689,16 +692,16 @@ def analyze_content() -> rx.Component:
                                 rx.el.span("Analyze Now"),
                             ),
                         ),
-                        on_click=lambda: ScanState.analyze(
+                        on_click=ScanState.start_analysis(
                             ScanState.input_text, ScanState.input_type
                         ),
                         disabled=ScanState.is_analyzing,
-                        class_name="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#E8471A] text-white text-sm font-medium hover:bg-[#c43a13] disabled:opacity-50",
+                        class_name="cursor-pointer active:scale-95 transition-all duration-75 flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#E8471A] text-white text-sm font-semibold hover:bg-[#c43a13] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow",
                     ),
                     rx.el.button(
                         "Clear",
                         on_click=ScanState.clear_result,
-                        class_name="px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50",
+                        class_name="cursor-pointer active:scale-95 transition-all duration-75 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 shadow-xs",
                     ),
                     class_name="flex items-center gap-3 mt-4",
                 ),
@@ -1109,13 +1112,13 @@ def history_content() -> rx.Component:
                         "Export CSV", class_name="text-xs font-semibold"
                     ),
                     on_click=ScanState.export_csv,
-                    class_name="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E8471A] text-white hover:bg-[#c43a13] transition-colors",
+                    class_name="cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E8471A] text-white hover:bg-[#c43a13] shadow-xs",
                 ),
                 rx.el.button(
                     rx.icon("trash-2", class_name="h-3.5 w-3.5"),
                     rx.el.span("Clear", class_name="text-xs font-semibold"),
                     on_click=ScanState.clear_history,
-                    class_name="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors",
+                    class_name="cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 shadow-xs",
                 ),
                 class_name="flex flex-wrap gap-2",
             ),
@@ -1195,7 +1198,7 @@ def history_content() -> rx.Component:
                                 on_click=lambda: ScanState.export_report(
                                     h["id"]
                                 ),
-                                class_name="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-orange-50 hover:border-orange-300 transition-colors",
+                                class_name="cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-orange-50 hover:border-orange-300 shadow-xs",
                             ),
                             rx.el.button(
                                 rx.icon("trash-2", class_name="h-3 w-3"),
@@ -1206,7 +1209,7 @@ def history_content() -> rx.Component:
                                 on_click=lambda: ScanState.delete_record(
                                     h["id"]
                                 ),
-                                class_name="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors",
+                                class_name="cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 shadow-xs",
                             ),
                             class_name="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100",
                         ),
@@ -1246,7 +1249,7 @@ def _assistant_quick_chip(icon: str, label: str, prompt: str) -> rx.Component:
         rx.icon(icon, class_name="h-3.5 w-3.5"),
         rx.el.span(label, class_name="text-xs font-semibold"),
         on_click=lambda: rx.set_value("chat-input", prompt),
-        class_name="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-orange-300 hover:bg-orange-50 hover:text-[#E8471A] transition-colors",
+        class_name="cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-orange-300 hover:bg-orange-50 hover:text-[#E8471A] shadow-xs",
     )
 
 
@@ -1329,7 +1332,7 @@ def _assistant_context_card() -> rx.Component:
                     "Explain this scan result in simple terms and tell me what to do next: "
                     + ScanState.summary,
                 ),
-                class_name="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg bg-[#E8471A] text-white hover:bg-[#c43a13]",
+                class_name="cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg bg-[#E8471A] text-white hover:bg-[#c43a13] shadow-xs",
             ),
             class_name="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-white p-4",
         ),
@@ -1443,7 +1446,7 @@ def assistant_content() -> rx.Component:
                                             class_name="text-sm text-gray-700 text-left",
                                         ),
                                         on_click=lambda: rx.set_value("chat-input", p),
-                                        class_name="flex items-start gap-2 p-3 rounded-xl border border-gray-200 bg-white hover:border-[#E8471A] hover:bg-orange-50 transition-colors text-left w-full",
+                                        class_name="cursor-pointer active:scale-[0.98] transition-all duration-75 flex items-start gap-2 p-3 rounded-xl border border-gray-200 bg-white hover:border-[#E8471A] hover:bg-orange-50 text-left w-full shadow-xs",
                                     ),
                                 ),
                                 class_name="grid grid-cols-1 md:grid-cols-2 gap-2",
@@ -1535,14 +1538,14 @@ def assistant_content() -> rx.Component:
                     rx.icon("send", class_name="h-4 w-4"),
                     type="submit",
                     disabled=AssistantState.is_thinking,
-                    class_name="px-4 py-3 rounded-xl bg-[#E8471A] text-white hover:bg-[#c43a13] disabled:opacity-50 transition-colors",
+                    class_name="cursor-pointer active:scale-95 transition-all duration-75 px-4 py-3 rounded-xl bg-[#E8471A] text-white hover:bg-[#c43a13] disabled:opacity-50 disabled:cursor-not-allowed shadow-xs",
                 ),
                 rx.el.button(
                     rx.icon("refresh-cw", class_name="h-4 w-4"),
                     type="button",
                     on_click=AssistantState.clear_chat,
                     title="Clear chat",
-                    class_name="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors",
+                    class_name="cursor-pointer active:scale-95 transition-all duration-75 px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 shadow-xs",
                 ),
                 on_submit=AssistantState.send_message,
                 class_name="flex items-center gap-2 mt-3",
@@ -1828,9 +1831,7 @@ def profile_content() -> rx.Component:
                                 ),
                                 rx.el.input(
                                     default_value=ProfileState.full_name,
-                                    on_change=ProfileState.set_full_name.debounce(
-                                        200
-                                    ),
+                                    on_change=ProfileState.set_full_name,
                                     class_name="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
                                 ),
                                 class_name="relative",
@@ -1849,9 +1850,7 @@ def profile_content() -> rx.Component:
                                 rx.el.input(
                                     placeholder="+91 98765 43210",
                                     default_value=ProfileState.phone,
-                                    on_change=ProfileState.set_phone.debounce(
-                                        200
-                                    ),
+                                    on_change=ProfileState.set_phone,
                                     class_name="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
                                 ),
                                 class_name="relative",
@@ -1869,9 +1868,7 @@ def profile_content() -> rx.Component:
                                 ),
                                 rx.el.input(
                                     default_value=ProfileState.location,
-                                    on_change=ProfileState.set_location.debounce(
-                                        200
-                                    ),
+                                    on_change=ProfileState.set_location,
                                     class_name="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
                                 ),
                                 class_name="relative",
@@ -1907,7 +1904,7 @@ def profile_content() -> rx.Component:
                             rx.el.textarea(
                                 placeholder="A short note about you...",
                                 default_value=ProfileState.bio,
-                                on_change=ProfileState.set_bio.debounce(200),
+                                on_change=ProfileState.set_bio,
                                 class_name="w-full px-3 py-2.5 rounded-lg border border-gray-300 bg-white text-sm min-h-[90px] focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
                             ),
                             class_name="md:col-span-2",
@@ -2092,9 +2089,14 @@ def _settings_section_header(icon: str, title: str, desc: str) -> rx.Component:
 
 
 def _action_button(
-    icon: str, label: str, desc: str, on_click=None, accent: str = "default"
+    icon: str,
+    label: str,
+    desc: str,
+    on_click=None,
+    href: str = None,
+    accent: str = "default",
 ) -> rx.Component:
-    base = "w-full flex items-center justify-between gap-3 p-3 rounded-xl border transition-colors text-left"
+    base = "cursor-pointer btn-press active:scale-[0.98] transition-all duration-75 w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-left"
     if accent == "danger":
         cls = (
             base
@@ -2117,7 +2119,7 @@ def _action_button(
         icon_cls = "h-4 w-4 text-gray-700"
         label_cls = "text-sm font-bold text-gray-900"
 
-    return rx.el.button(
+    content = [
         rx.el.div(
             rx.el.div(
                 rx.icon(icon, class_name=icon_cls),
@@ -2130,9 +2132,11 @@ def _action_button(
             class_name="flex items-center gap-3",
         ),
         rx.icon("chevron-right", class_name="h-4 w-4 text-gray-400"),
-        on_click=on_click,
-        class_name=cls,
-    )
+    ]
+
+    if href:
+        return rx.el.a(*content, href=href, class_name=cls)
+    return rx.el.button(*content, on_click=on_click, class_name=cls)
 
 
 def _delete_account_modal() -> rx.Component:
@@ -2315,34 +2319,24 @@ def settings_content() -> rx.Component:
                 ),
                 toggle_row(
                     "Two-factor authentication",
-                    "Add an extra security layer with OTP",
+                    "Add an extra security layer with OTP verification",
                     ProfileState.two_factor_enabled,
                     ProfileState.toggle_2fa,
-                ),
-                toggle_row(
-                    "Biometric sign-in",
-                    "Use device fingerprint or face unlock",
-                    ProfileState.biometric_enabled,
-                    ProfileState.toggle_biometric,
                 ),
                 rx.el.div(
                     _action_button(
                         "key-round",
                         "Change Password",
-                        "Update your password regularly",
+                        "Update your account password",
+                        href="/reset-password",
                     ),
                     _action_button(
                         "log-out",
                         "Sign out of all devices",
-                        "Revoke all active sessions",
+                        "Revoke active session on this device",
                         on_click=AuthState.logout,
                     ),
-                    _action_button(
-                        "history",
-                        "Login activity",
-                        "Recent sign-in history and locations",
-                    ),
-                    class_name="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4",
+                    class_name="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4",
                 ),
                 class_name="mt-4",
             ),
@@ -2402,17 +2396,19 @@ def settings_content() -> rx.Component:
                         ),
                         rx.icon("download", class_name="h-4 w-4 text-gray-400"),
                         on_click=ScanState.export_csv,
-                        class_name="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-orange-200 bg-orange-50/30 hover:bg-orange-50 hover:border-orange-300 transition-colors",
+                        class_name="btn-press w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-orange-200 bg-orange-50/30 hover:bg-orange-50 hover:border-orange-300 transition-colors",
                     ),
                     _action_button(
                         "file-text",
                         "Privacy Policy",
                         "Review how we handle your data",
+                        href="/legal",
                     ),
                     _action_button(
                         "scroll-text",
                         "Terms of Service",
                         "Read our usage agreement",
+                        href="/legal",
                     ),
                     class_name="grid grid-cols-1 md:grid-cols-3 gap-3",
                 ),

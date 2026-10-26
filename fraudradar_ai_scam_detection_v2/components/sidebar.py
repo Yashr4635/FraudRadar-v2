@@ -28,8 +28,8 @@ def nav_link(icon: str, label: str, href: str) -> rx.Component:
         href=href,
         class_name=rx.cond(
             active,
-            "nav-pill group flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gradient-to-r from-[#E8471A] to-[#c43a13] text-white shadow-md shadow-orange-200/60",
-            "nav-pill group flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-gray-700 hover:bg-orange-50/60 hover:text-[#E8471A]",
+            "cursor-pointer nav-pill group flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-gradient-to-r from-[#E8471A] to-[#c43a13] text-white shadow-md shadow-orange-200/60 active:scale-[0.98] transition-all duration-75",
+            "cursor-pointer nav-pill group flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-gray-700 hover:bg-orange-50/60 hover:text-[#E8471A] active:scale-[0.98] transition-all duration-75",
         ),
     )
 
@@ -46,7 +46,7 @@ def bottom_action(icon: str, label: str, href: str = "#") -> rx.Component:
         rx.icon(icon, class_name="h-3.5 w-3.5 text-gray-500"),
         rx.el.span(label, class_name="text-xs font-medium text-gray-700"),
         href=href,
-        class_name="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 hover:text-[#E8471A] transition-colors",
+        class_name="cursor-pointer flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 hover:text-[#E8471A] active:scale-95 transition-all duration-75",
     )
 
 
@@ -54,9 +54,10 @@ def sidebar() -> rx.Component:
     return rx.el.aside(
         rx.el.div(
             rx.el.div(
-                rx.el.div(
-                    rx.icon("shield-check", class_name="h-5 w-5 text-white icon-spin-hover"),
-                    class_name="h-10 w-10 rounded-xl bg-gradient-to-br from-[#E8471A] to-[#c43a13] flex items-center justify-center shadow-md shadow-orange-200/60",
+                rx.el.img(
+                    src="/fraudradar_shield.png",
+                    alt="FraudRadar Logo",
+                    class_name="h-10 w-10 rounded-xl shadow-md object-contain bg-slate-900 icon-spin-hover",
                 ),
                 rx.el.div(
                     rx.el.p("FraudRadar", class_name="text-sm font-bold text-gray-900"),
@@ -96,7 +97,7 @@ def sidebar() -> rx.Component:
                         rx.icon("phone", class_name="h-3 w-3"),
                         rx.el.span("Call Now"),
                         href="tel:1930",
-                        class_name="btn-press mt-2.5 w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E8471A] text-white text-[11px] font-bold hover:bg-[#c43a13] transition-colors",
+                        class_name="cursor-pointer btn-press active:scale-95 transition-all duration-75 mt-2.5 w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E8471A] text-white text-[11px] font-bold hover:bg-[#c43a13] shadow-xs",
                     ),
                     class_name="rounded-2xl border border-orange-200/70 bg-gradient-to-br from-orange-50 to-white p-3 shadow-xs",
                 ),
@@ -110,7 +111,7 @@ def sidebar() -> rx.Component:
                     rx.icon("log-out", class_name="h-3.5 w-3.5"),
                     rx.el.span("Sign Out", class_name="text-xs font-semibold"),
                     on_click=AuthState.logout,
-                    class_name="btn-press mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors",
+                    class_name="cursor-pointer btn-press active:scale-95 transition-all duration-75 mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600 shadow-xs",
                 ),
                 rx.el.div(
                     rx.el.div(
@@ -138,9 +139,10 @@ def sidebar() -> rx.Component:
 def mobile_top() -> rx.Component:
     return rx.el.div(
         rx.el.div(
-            rx.el.div(
-                rx.icon("shield-check", class_name="h-4 w-4 text-white"),
-                class_name="h-9 w-9 rounded-xl bg-gradient-to-br from-[#E8471A] to-[#c43a13] flex items-center justify-center",
+            rx.el.img(
+                src="/fraudradar_shield.png",
+                alt="FraudRadar Logo",
+                class_name="h-9 w-9 rounded-xl shadow-md object-contain bg-slate-900",
             ),
             rx.el.div(
                 rx.el.p("FraudRadar", class_name="text-sm font-bold text-gray-900"),
@@ -152,12 +154,12 @@ def mobile_top() -> rx.Component:
             rx.el.a(
                 rx.icon("scan-search", class_name="h-4 w-4 text-white"),
                 href="/analyze",
-                class_name="h-9 w-9 rounded-xl bg-[#E8471A] flex items-center justify-center",
+                class_name="cursor-pointer active:scale-95 transition-all duration-75 h-9 w-9 rounded-xl bg-[#E8471A] flex items-center justify-center shadow-xs",
             ),
             rx.el.button(
                 rx.icon("log-out", class_name="h-4 w-4 text-gray-700"),
                 on_click=AuthState.logout,
-                class_name="h-9 w-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center",
+                class_name="cursor-pointer active:scale-95 transition-all duration-75 h-9 w-9 rounded-xl border border-gray-200 bg-white flex items-center justify-center shadow-xs",
             ),
             class_name="flex items-center gap-2",
         ),
@@ -179,7 +181,7 @@ def mobile_tabbar() -> rx.Component:
                 rx.icon(icon, class_name="h-4 w-4"),
                 rx.el.span(label, class_name="text-[10px] font-semibold mt-0.5"),
                 href=href,
-                class_name="flex flex-col items-center justify-center gap-0 flex-1 py-2 text-gray-500 hover:text-[#E8471A] transition-colors",
+                class_name="cursor-pointer active:scale-95 transition-all duration-75 flex flex-col items-center justify-center gap-0 flex-1 py-2 text-gray-500 hover:text-[#E8471A]",
             )
             for icon, label, href in items
         ],

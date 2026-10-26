@@ -321,6 +321,18 @@ class TestFullScannerSyntheticMessages(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(self.state.risk_score, 80)
         self.assertIn("Utility Scam", self.state.categories)
 
+    async def test_clear_result_resets_input_and_results(self):
+        # Verify that clear_result empties input_text, has_result, and error
+        self.state.input_text = "Suspicious phishing text to clear"
+        self.state.has_result = True
+        self.state.error = "Some previous scan error"
+
+        await self.state.clear_result()
+
+        self.assertEqual(self.state.input_text, "")
+        self.assertFalse(self.state.has_result)
+        self.assertEqual(self.state.error, "")
+
 
 class TestSafeOverridePrevention(unittest.TestCase):
     """Regression test ensuring suspicious evidence cannot be overridden by safe rules."""

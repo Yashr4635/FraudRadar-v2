@@ -98,7 +98,7 @@ def quick_action_card(icon: str, title: str, desc: str, href: str, accent: str) 
             class_name="flex items-center gap-1 mt-3",
         ),
         href=href,
-        class_name="group relative bg-white border border-gray-200 rounded-2xl p-4 hover:border-orange-300 hover:shadow-lg hover:-translate-y-1 transition-all duration-300",
+        class_name="group relative bg-white border border-gray-200 rounded-2xl p-4 hover:border-orange-300 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] transition-all duration-150 cursor-pointer",
     )
 
 
@@ -319,8 +319,8 @@ def tips_carousel() -> rx.Component:
                 class_name="flex items-center gap-1.5",
             ),
             rx.el.div(
-                rx.el.button(rx.icon("chevron-left", class_name="h-3.5 w-3.5"), on_click=DashboardState.prev_tip, class_name="h-7 w-7 rounded-md border border-gray-200 hover:border-orange-300 hover:bg-orange-50 flex items-center justify-center transition-colors"),
-                rx.el.button(rx.icon("chevron-right", class_name="h-3.5 w-3.5"), on_click=DashboardState.next_tip, class_name="h-7 w-7 rounded-md border border-gray-200 hover:border-orange-300 hover:bg-orange-50 flex items-center justify-center transition-colors"),
+                rx.el.button(rx.icon("chevron-left", class_name="h-3.5 w-3.5"), on_click=DashboardState.prev_tip, class_name="cursor-pointer active:scale-90 transition-all duration-75 h-7 w-7 rounded-md border border-gray-200 hover:border-orange-300 hover:bg-orange-50 flex items-center justify-center shadow-xs"),
+                rx.el.button(rx.icon("chevron-right", class_name="h-3.5 w-3.5"), on_click=DashboardState.next_tip, class_name="cursor-pointer active:scale-90 transition-all duration-75 h-7 w-7 rounded-md border border-gray-200 hover:border-orange-300 hover:bg-orange-50 flex items-center justify-center shadow-xs"),
                 class_name="flex items-center gap-1",
             ),
             class_name="flex items-center justify-between mb-4",
@@ -338,7 +338,7 @@ def tips_carousel() -> rx.Component:
                 DashboardState.tips,
                 lambda t, i: rx.el.button(
                     on_click=lambda: DashboardState.set_tip(i),
-                    class_name=rx.cond(i == DashboardState.current_tip, "h-1.5 w-6 rounded-full bg-[#E8471A]", "h-1.5 w-1.5 rounded-full bg-gray-300 hover:bg-gray-400 transition-colors"),
+                    class_name=rx.cond(i == DashboardState.current_tip, "cursor-pointer h-1.5 w-6 rounded-full bg-[#E8471A] transition-all", "cursor-pointer h-1.5 w-1.5 rounded-full bg-gray-300 hover:bg-gray-400 transition-all"),
                 ),
             ),
             class_name="flex items-center justify-center gap-1.5 mt-4",

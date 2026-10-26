@@ -82,3 +82,53 @@ div[class*="reflex-badge"] {
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+/* ─── Instant UI/UX Feedback & Responsive Cursor ─── */
+button,
+a,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+summary,
+.cursor-pointer,
+.btn-press,
+.nav-pill,
+.lift-card,
+[tabindex="0"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer !important;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+[role="button"][aria-disabled="true"],
+.disabled {
+  cursor: not-allowed !important;
+}
+
+button:active:not(:disabled),
+a:active,
+[role="button"]:active:not(:disabled),
+.btn-press:active:not(:disabled) {
+  transform: scale(0.97) translateY(1px) !important;
+  transition: transform 0.05s ease-out !important;
+}
+
+button,
+a,
+[role="button"],
+.nav-pill,
+.btn-press {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.12s ease,
+              border-color 0.12s ease,
+              box-shadow 0.12s ease;
+  will-change: transform;
+}
+
