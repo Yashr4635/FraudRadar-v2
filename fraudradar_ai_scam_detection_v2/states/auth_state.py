@@ -622,25 +622,54 @@ class AuthState(rx.State):
             self.show_otp_view = False
             return
 
-        # Generate & send cryptographically secure 8-digit OTP
-        ok, msg, masked = otp_service.send_auth_otp(
-            email=email,
-            purpose="login",
-            recipient_name=user.get("full_name", ""),
-        )
+        # Primary: If custom SMTP / transactional email is configured (or dev/test mode), deliver 8-digit OTP
+        if EmailService.is_configured() or EmailService.is_dev_mode():
+            ok, msg, masked = otp_service.send_auth_otp(
+                email=email,
+                purpose="login",
+                recipient_name=user.get("full_name", ""),
+            )
+            if ok:
+                self.otp_loading = False
+                self.otp_email = email
+                self.otp_type = "login"
+                self.show_otp_view = True
+                self.otp_code = ""
+                self.auth_success = msg
+                return AuthState.start_resend_countdown
+            # If custom SMTP failed, log and fall through to Supabase GoTrue
+
+        # Fallback: Restore previously working Supabase GoTrue OTP delivery
+        sb = get_supabase()
+        if sb is not None:
+            try:
+                sb.auth.sign_in_with_otp({
+                    "email": email,
+                    "options": {"should_create_user": False}
+                })
+                self.otp_loading = False
+                self.otp_email = email
+                self.otp_type = "login"
+                self.show_otp_view = True
+                self.otp_code = ""
+                masked = mask_email(email)
+                self.auth_success = f"Verification code sent to {masked}. Please check your inbox."
+                return AuthState.start_resend_countdown
+            except Exception as e:
+                logging.exception(f"Supabase GoTrue OTP delivery error: {e}")
+                msg_sb = str(e).lower()
+                if "signups not allowed" in msg_sb or "user not found" in msg_sb:
+                    self.auth_error = "No account found with this email. Please create an account first."
+                else:
+                    self.auth_error = _friendly_auth_error(e, "send verification code")
+                self.otp_loading = False
+                self.show_otp_view = False
+                return
 
         self.otp_loading = False
-        if not ok:
-            self.auth_error = msg
-            self.show_otp_view = False
-            return
-
-        self.otp_email = email
-        self.otp_type = "login"
-        self.show_otp_view = True
-        self.otp_code = ""
-        self.auth_success = msg
-        return AuthState.start_resend_countdown
+        self.auth_error = "Email delivery service is not configured. Outbound email could not be sent."
+        self.show_otp_view = False
+        return
 
     @rx.event
     def verify_email_otp(self, form_data: dict = None):
@@ -656,13 +685,13 @@ class AuthState(rx.State):
             self.otp_error = "Email address missing. Please go back and enter your email."
             return
         if not code:
-            self.otp_error = "Please enter the 8-digit verification code."
+            self.otp_error = "Please enter the verification code."
             return
 
         import re as _re
         clean_code = _re.sub(r"\D", "", code)
-        if len(clean_code) != 8:
-            self.otp_error = "Please enter a valid verification code (8 digits)."
+        if len(clean_code) not in (6, 8):
+            self.otp_error = "Please enter a valid verification code (6 or 8 digits)."
             return
 
         self.otp_loading = True
@@ -766,19 +795,35 @@ class AuthState(rx.State):
             if u:
                 name = u.get("full_name", "")
 
-        ok, msg, masked = otp_service.send_auth_otp(
-            email=email,
-            purpose=purpose,
-            recipient_name=name,
-        )
+        if EmailService.is_configured() or EmailService.is_dev_mode():
+            ok, msg, masked = otp_service.send_auth_otp(
+                email=email,
+                purpose=purpose,
+                recipient_name=name,
+            )
+            if ok:
+                self.otp_loading = False
+                self.auth_success = f"A new verification code has been sent to {masked}."
+                return AuthState.start_resend_countdown
+
+        # Fallback to Supabase GoTrue resend
+        sb = get_supabase()
+        if sb is not None:
+            try:
+                sb.auth.sign_in_with_otp({"email": email, "options": {"should_create_user": False}})
+                self.otp_loading = False
+                masked = mask_email(email)
+                self.auth_success = f"A new verification code has been sent to {masked}."
+                return AuthState.start_resend_countdown
+            except Exception as e:
+                logging.exception(f"Supabase resend error: {e}")
+                self.otp_error = _friendly_auth_error(e, "resend code")
+                self.otp_loading = False
+                return
 
         self.otp_loading = False
-        if not ok:
-            self.otp_error = msg
-            return
-
-        self.auth_success = f"A new 8-digit verification code has been sent to {masked}."
-        return AuthState.start_resend_countdown
+        self.otp_error = "Could not resend verification code. Please check your network connection."
+        return
 
     @rx.event
     def login_with_google(self):

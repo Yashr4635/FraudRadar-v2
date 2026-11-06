@@ -480,7 +480,7 @@ def otp_verification_card() -> rx.Component:
         ),
         rx.el.h2("Verify Your Email", class_name="text-2xl font-bold text-gray-900 tracking-tight text-center"),
         rx.el.p(
-            "Enter the 8-digit confirmation code sent to ",
+            "Enter the confirmation code sent to ",
             rx.el.span(AuthState.masked_otp_email, class_name="font-semibold text-gray-900"),
             ".",
             class_name="text-sm text-gray-500 mt-1 leading-relaxed text-center",
@@ -505,7 +505,7 @@ def otp_verification_card() -> rx.Component:
         ),
         rx.el.div(
             rx.el.label(
-                "8-Digit Verification Code",
+                "Verification Code",
                 class_name="block text-xs font-semibold text-gray-700 mb-1.5 tracking-wide text-center",
             ),
             rx.el.div(
