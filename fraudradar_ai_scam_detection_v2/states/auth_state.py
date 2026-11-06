@@ -635,7 +635,7 @@ class AuthState(rx.State):
         self.otp_type = "login"
         self.show_otp_view = True
         self.otp_code = ""
-        self.auth_success = f"Verification code sent to {masked}. Please enter the 8-digit code below."
+        self.auth_success = msg
         return AuthState.start_resend_countdown
 
     @rx.event
