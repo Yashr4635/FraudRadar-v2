@@ -68,6 +68,8 @@ class EmailService:
             return True
         if os.getenv("RESEND_API_KEY"):
             return True
+        if os.getenv("BREVO_API_KEY"):
+            return True
         if os.getenv("SENDGRID_API_KEY"):
             return True
         return False
@@ -359,7 +361,22 @@ Helpline: 1930 | https://cybercrime.gov.in
                 resend_key,
             )
 
-        # ── 3. Check SendGrid API ────────────────────────────────────────────
+        # ── 3. Check Brevo API ───────────────────────────────────────────────
+        brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+        if brevo_key:
+            return cls._send_via_brevo(
+                clean_recipient,
+                masked_rec,
+                from_email,
+                from_name,
+                subject,
+                html_content,
+                text_content,
+                purpose,
+                brevo_key,
+            )
+
+        # ── 4. Check SendGrid API ────────────────────────────────────────────
         sendgrid_key = os.getenv("SENDGRID_API_KEY", "").strip()
         if sendgrid_key:
             return cls._send_via_sendgrid(
@@ -698,4 +715,184 @@ Helpline: 1930 | https://cybercrime.gov.in
                 provider="sendgrid",
                 error=err_msg,
             )
+
+    @classmethod
+    def _send_via_brevo(
+        cls,
+        recipient: str,
+        masked_rec: str,
+        from_email: str,
+        from_name: str,
+        subject: str,
+        html_content: str,
+        text_content: str,
+        purpose: str,
+        api_key: str,
+    ) -> EmailDeliveryResult:
+        """Deliver email using Brevo (formerly Sendinblue) REST API."""
+        try:
+            payload = {
+                "sender": {"name": from_name, "email": from_email},
+                "to": [{"email": recipient}],
+                "subject": subject,
+                "htmlContent": html_content,
+                "textContent": text_content,
+            }
+            headers = {
+                "api-key": api_key,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            }
+            with httpx.Client(timeout=10.0) as client:
+                resp = client.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    json=payload,
+                    headers=headers,
+                )
+                if resp.status_code in (200, 201):
+                    auth_db.log_delivery(
+                        recipient=masked_rec,
+                        purpose=purpose,
+                        status="SENT",
+                        provider="brevo",
+                        error_message="",
+                    )
+                    return EmailDeliveryResult(
+                        success=True,
+                        message=f"Verification code sent to {masked_rec}.",
+                        provider="brevo",
+                    )
+                else:
+                    err_text = resp.text
+                    logger.error(f"[BREVO_ERROR] {resp.status_code} - {err_text}")
+                    auth_db.log_delivery(
+                        recipient=masked_rec,
+                        purpose=purpose,
+                        status="FAILED",
+                        provider="brevo",
+                        error_message=f"{resp.status_code}: {err_text}",
+                    )
+                    return EmailDeliveryResult(
+                        success=False,
+                        message="Failed to send verification code via email provider.",
+                        provider="brevo",
+                        error=err_text,
+                    )
+        except Exception as e:
+            err_msg = f"Brevo API error: {str(e)}"
+            logger.exception(f"[BREVO_EXCEPTION] {err_msg}")
+            auth_db.log_delivery(
+                recipient=masked_rec,
+                purpose=purpose,
+                status="FAILED",
+                provider="brevo",
+                error_message=err_msg,
+            )
+            return EmailDeliveryResult(
+                success=False,
+                message="Email delivery service encountered a network error.",
+                provider="brevo",
+                error=err_msg,
+            )
+
+    @classmethod
+    def test_connection(cls) -> Tuple[bool, str]:
+        """Test authentication and connectivity with configured email provider without sending an email."""
+        smtp_host = os.getenv("SMTP_HOST", "").strip()
+        smtp_user = os.getenv("SMTP_USER", "").strip()
+        smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+        if smtp_host and smtp_user and smtp_password:
+            smtp_port = int(os.getenv("SMTP_PORT", "587"))
+            use_ssl = (
+                os.getenv("SMTP_USE_SSL", "false").lower() in ("true", "1")
+                or smtp_port == 465
+            )
+            use_tls = (
+                os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1")
+                and not use_ssl
+            )
+            try:
+                context = ssl.create_default_context()
+                if use_ssl:
+                    server = smtplib.SMTP_SSL(
+                        smtp_host, smtp_port, context=context, timeout=10.0
+                    )
+                else:
+                    server = smtplib.SMTP(
+                        smtp_host, smtp_port, timeout=10.0
+                    )
+                    if use_tls:
+                        server.starttls(context=context)
+                server.login(smtp_user, smtp_password)
+                server.quit()
+                return (
+                    True,
+                    f"SMTP handshake and login succeeded on {smtp_host}:{smtp_port}.",
+                )
+            except Exception as e:
+                return False, f"SMTP connection failed: {e}"
+
+        resend_key = os.getenv("RESEND_API_KEY", "").strip()
+        if resend_key:
+            try:
+                with httpx.Client(timeout=10.0) as client:
+                    resp = client.get(
+                        "https://api.resend.com/api-keys",
+                        headers={"Authorization": f"Bearer {resend_key}"},
+                    )
+                    if resp.status_code in (200, 201):
+                        return True, "Resend API connection authenticated successfully."
+                    return (
+                        False,
+                        f"Resend API authentication failed: {resp.status_code} {resp.text}",
+                    )
+            except Exception as e:
+                return False, f"Resend API connection error: {e}"
+
+        brevo_key = os.getenv("BREVO_API_KEY", "").strip()
+        if brevo_key:
+            try:
+                with httpx.Client(timeout=10.0) as client:
+                    resp = client.get(
+                        "https://api.brevo.com/v3/account",
+                        headers={"api-key": brevo_key},
+                    )
+                    if resp.status_code == 200:
+                        email = resp.json().get("email", "")
+                        return (
+                            True,
+                            f"Brevo API authenticated successfully for account {email}.",
+                        )
+                    return (
+                        False,
+                        f"Brevo API authentication failed: {resp.status_code} {resp.text}",
+                    )
+            except Exception as e:
+                return False, f"Brevo API connection error: {e}"
+
+        sendgrid_key = os.getenv("SENDGRID_API_KEY", "").strip()
+        if sendgrid_key:
+            try:
+                with httpx.Client(timeout=10.0) as client:
+                    resp = client.get(
+                        "https://api.sendgrid.com/v3/user/profile",
+                        headers={"Authorization": f"Bearer {sendgrid_key}"},
+                    )
+                    if resp.status_code == 200:
+                        return True, "SendGrid API authenticated successfully."
+                    return (
+                        False,
+                        f"SendGrid API authentication failed: {resp.status_code} {resp.text}",
+                    )
+            except Exception as e:
+                return False, f"SendGrid API connection error: {e}"
+
+        if cls.is_dev_mode():
+            return True, "Development Outbox mode active (mock delivery)."
+
+        return (
+            False,
+            "No email credentials configured (SMTP_HOST, RESEND_API_KEY, BREVO_API_KEY, SENDGRID_API_KEY).",
+        )
+
 

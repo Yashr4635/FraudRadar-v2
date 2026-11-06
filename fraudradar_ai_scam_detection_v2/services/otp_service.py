@@ -22,12 +22,17 @@ from fraudradar_ai_scam_detection_v2.services.email_service import (
 
 logger = logging.getLogger("fraudradar.otp_service")
 
-JWT_SECRET = (
-    os.getenv("JWT_SECRET")
-    or os.getenv("SUPABASE_KEY")
-    or "fraudradar-secure-jwt-key-2026-production"
-)
 JWT_ALGORITHM = "HS256"
+
+
+def get_jwt_secret() -> str:
+    """Dynamically retrieve the cryptographic JWT signing key with safe ephemeral fallback."""
+    secret = (os.getenv("JWT_SECRET") or os.getenv("SUPABASE_KEY") or "").strip()
+    if not secret or secret == "fraudradar-secure-jwt-key-2026-production":
+        if not hasattr(get_jwt_secret, "_ephemeral_secret"):
+            get_jwt_secret._ephemeral_secret = secrets.token_hex(32)
+        return get_jwt_secret._ephemeral_secret
+    return secret
 
 
 def generate_8_digit_otp() -> str:
@@ -152,7 +157,7 @@ def create_user_jwt(user: Dict[str, Any], expiry_days: int = 7) -> str:
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
 def verify_user_jwt(token: str) -> Optional[Dict[str, Any]]:
@@ -160,7 +165,7 @@ def verify_user_jwt(token: str) -> Optional[Dict[str, Any]]:
     if not token or not isinstance(token, str):
         return None
     try:
-        payload = jwt.decode(token.strip(), JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token.strip(), get_jwt_secret(), algorithms=[JWT_ALGORITHM])
         return payload
     except Exception as e:
         logger.debug(f"JWT verification notice: {e}")

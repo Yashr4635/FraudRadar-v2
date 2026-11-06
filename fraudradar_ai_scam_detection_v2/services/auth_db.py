@@ -16,17 +16,168 @@ os.makedirs(DB_DIR, exist_ok=True)
 DB_PATH = os.path.join(DB_DIR, "auth.db")
 
 
-def get_connection() -> sqlite3.Connection:
+def is_postgres() -> bool:
+    """Check if a persistent PostgreSQL database connection URL is configured."""
+    url = (os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DB_URL") or "").strip()
+    return url.startswith("postgres://") or url.startswith("postgresql://")
+
+
+def get_connection():
+    """
+    Get a database connection.
+    If DATABASE_URL or SUPABASE_DB_URL is set, returns a psycopg PostgreSQL connection.
+    Otherwise returns an ACID SQLite WAL-mode connection.
+    """
+    if is_postgres():
+        import psycopg
+        from psycopg.rows import dict_row
+
+        url = (os.getenv("DATABASE_URL") or os.getenv("SUPABASE_DB_URL") or "").strip()
+        if url.startswith("postgres://"):
+            url = "postgresql://" + url[len("postgres://") :]
+        return psycopg.connect(url, row_factory=dict_row)
+    else:
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA foreign_keys=ON;")
+        return conn
+
+
+def _exec(conn, query: str, params: tuple = ()):
+    """Execute query with automatic parameter translation (? for SQLite, %s for PostgreSQL)."""
+    if is_postgres():
+        pg_query = query.replace("?", "%s")
+        cur = conn.cursor()
+        cur.execute(pg_query, params)
+        return cur
+    else:
+        cur = conn.cursor()
+        cur.execute(query, params)
+        return cur
+
+
+def migrate_sqlite_to_postgres(pg_conn) -> None:
+    """Migrate local SQLite user accounts to PostgreSQL to prevent any data loss."""
+    if not os.path.exists(DB_PATH):
+        return
+    try:
+        with pg_conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS cnt FROM users;")
+            row = cur.fetchone()
+            count = row["cnt"] if isinstance(row, dict) else row[0]
+            if count > 0:
+                return  # Database already populated
+
+        s_conn = sqlite3.connect(DB_PATH)
+        s_conn.row_factory = sqlite3.Row
+        s_cur = s_conn.cursor()
+        s_cur.execute("SELECT * FROM users;")
+        sqlite_users = [dict(r) for r in s_cur.fetchall()]
+        s_conn.close()
+
+        if not sqlite_users:
+            return
+
+        with pg_conn:
+            with pg_conn.cursor() as cur:
+                for u in sqlite_users:
+                    cur.execute(
+                        """
+                        INSERT INTO users (id, email, full_name, password_hash, is_verified, provider, created_at, last_login_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (email) DO NOTHING;
+                        """,
+                        (
+                            u["id"],
+                            u["email"],
+                            u["full_name"],
+                            u["password_hash"],
+                            u["is_verified"],
+                            u["provider"],
+                            u["created_at"],
+                            u["last_login_at"],
+                        ),
+                    )
+        logger.info(
+            f"[AUTH_DB] Migrated {len(sqlite_users)} users from SQLite to PostgreSQL."
+        )
+    except Exception as e:
+        logger.warning(f"[AUTH_DB] SQLite to PostgreSQL migration notice: {e}")
+
+
+def init_db() -> None:
+    """Initialize database tables with users, otps, and delivery logs."""
+    if is_postgres():
+        try:
+            conn = get_connection()
+            try:
+                with conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS users (
+                                id TEXT PRIMARY KEY,
+                                email TEXT UNIQUE NOT NULL,
+                                full_name TEXT NOT NULL,
+                                password_hash TEXT,
+                                is_verified INTEGER DEFAULT 0,
+                                provider TEXT DEFAULT 'email',
+                                created_at TEXT NOT NULL,
+                                last_login_at TEXT
+                            );
+                            CREATE INDEX IF NOT EXISTS idx_users_email ON users(LOWER(email));
+
+                            CREATE TABLE IF NOT EXISTS otps (
+                                id SERIAL PRIMARY KEY,
+                                email TEXT NOT NULL,
+                                purpose TEXT NOT NULL,
+                                otp_hash TEXT NOT NULL,
+                                salt TEXT NOT NULL,
+                                expires_at TEXT NOT NULL,
+                                attempts INTEGER DEFAULT 0,
+                                max_attempts INTEGER DEFAULT 5,
+                                consumed INTEGER DEFAULT 0,
+                                created_at TEXT NOT NULL
+                            );
+                            CREATE INDEX IF NOT EXISTS idx_otps_lookup ON otps(LOWER(email), purpose, consumed);
+
+                            CREATE TABLE IF NOT EXISTS pending_signups (
+                                email TEXT PRIMARY KEY,
+                                full_name TEXT NOT NULL,
+                                password_hash TEXT NOT NULL,
+                                created_at TEXT NOT NULL
+                            );
+
+                            CREATE TABLE IF NOT EXISTS delivery_logs (
+                                id SERIAL PRIMARY KEY,
+                                timestamp TEXT NOT NULL,
+                                recipient TEXT NOT NULL,
+                                purpose TEXT NOT NULL,
+                                status TEXT NOT NULL,
+                                provider TEXT NOT NULL,
+                                error_message TEXT
+                            );
+                            CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON delivery_logs(timestamp);
+                            """
+                        )
+                logger.info(
+                    "[AUTH_DB] PostgreSQL schema verified/initialized successfully."
+                )
+                migrate_sqlite_to_postgres(conn)
+                return
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.error(
+                f"[AUTH_DB] Failed to initialize PostgreSQL ({e}). Falling back to SQLite."
+            )
+
+    # Initialize SQLite database
     conn = sqlite3.connect(DB_PATH, timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
-    return conn
-
-
-def init_db() -> None:
-    """Initialize SQLite database with users, otps, and delivery logs."""
-    conn = get_connection()
     try:
         with conn:
             conn.execute(
@@ -126,8 +277,11 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         return None
     conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE email = ? LIMIT 1;", (clean_email,))
+        cur = _exec(
+            conn,
+            "SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1;",
+            (clean_email,),
+        )
         row = cur.fetchone()
         return dict(row) if row else None
     finally:
@@ -138,8 +292,9 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     """Fetch user by ID."""
     conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE id = ? LIMIT 1;", (user_id,))
+        cur = _exec(
+            conn, "SELECT * FROM users WHERE id = ? LIMIT 1;", (user_id,)
+        )
         row = cur.fetchone()
         return dict(row) if row else None
     finally:
@@ -162,7 +317,8 @@ def create_user(
     conn = get_connection()
     try:
         with conn:
-            conn.execute(
+            _exec(
+                conn,
                 """
                 INSERT INTO users (id, email, full_name, password_hash, is_verified, provider, created_at, last_login_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -204,7 +360,8 @@ def store_pending_signup(email: str, full_name: str, password: str) -> None:
     conn = get_connection()
     try:
         with conn:
-            conn.execute(
+            _exec(
+                conn,
                 """
                 INSERT INTO pending_signups (email, full_name, password_hash, created_at)
                 VALUES (?, ?, ?, ?)
@@ -224,13 +381,13 @@ def commit_pending_signup(email: str) -> Optional[Dict[str, Any]]:
     clean_email = email.strip().lower()
     conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM pending_signups WHERE email = ? LIMIT 1;", (clean_email,)
+        cur = _exec(
+            conn,
+            "SELECT * FROM pending_signups WHERE LOWER(email) = ? LIMIT 1;",
+            (clean_email,),
         )
         pending = cur.fetchone()
         if not pending:
-            # Fallback if pending record was missing
             existing = get_user_by_email(clean_email)
             if existing:
                 mark_user_verified(clean_email)
@@ -244,7 +401,8 @@ def commit_pending_signup(email: str) -> Optional[Dict[str, Any]]:
         user_id = secrets.token_hex(16)
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with conn:
-            conn.execute(
+            _exec(
+                conn,
                 """
                 INSERT INTO users (id, email, full_name, password_hash, is_verified, provider, created_at, last_login_at)
                 VALUES (?, ?, ?, ?, 1, 'email', ?, ?)
@@ -263,11 +421,17 @@ def commit_pending_signup(email: str) -> Optional[Dict[str, Any]]:
                     now,
                 ),
             )
-            conn.execute(
-                "DELETE FROM pending_signups WHERE email = ?;", (clean_email,)
+            _exec(
+                conn,
+                "DELETE FROM pending_signups WHERE LOWER(email) = ?;",
+                (clean_email,),
             )
 
-        cur.execute("SELECT * FROM users WHERE email = ? LIMIT 1;", (clean_email,))
+        cur = _exec(
+            conn,
+            "SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1;",
+            (clean_email,),
+        )
         row = cur.fetchone()
         return dict(row) if row else None
     finally:
@@ -281,11 +445,12 @@ def mark_user_verified(email: str) -> None:
     conn = get_connection()
     try:
         with conn:
-            conn.execute(
+            _exec(
+                conn,
                 """
                 UPDATE users
                 SET is_verified = 1, last_login_at = ?
-                WHERE email = ?;
+                WHERE LOWER(email) = ?;
                 """,
                 (now, clean_email),
             )
@@ -300,8 +465,9 @@ def update_last_login(email: str) -> None:
     conn = get_connection()
     try:
         with conn:
-            conn.execute(
-                "UPDATE users SET last_login_at = ? WHERE email = ?;",
+            _exec(
+                conn,
+                "UPDATE users SET last_login_at = ? WHERE LOWER(email) = ?;",
                 (now, clean_email),
             )
     finally:
@@ -333,16 +499,18 @@ def store_otp(
     try:
         with conn:
             # 1. Invalidate previous active OTPs for this email and purpose
-            conn.execute(
+            _exec(
+                conn,
                 """
                 UPDATE otps
                 SET consumed = 1
-                WHERE email = ? AND purpose = ? AND consumed = 0;
+                WHERE LOWER(email) = ? AND purpose = ? AND consumed = 0;
                 """,
                 (clean_email, purpose),
             )
             # 2. Insert new hashed OTP record
-            conn.execute(
+            _exec(
+                conn,
                 """
                 INSERT INTO otps (email, purpose, otp_hash, salt, expires_at, attempts, max_attempts, consumed, created_at)
                 VALUES (?, ?, ?, ?, ?, 0, ?, 0, ?);
@@ -376,18 +544,21 @@ def verify_and_consume_otp(
 
     conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute(
+        cur = _exec(
+            conn,
             """
             SELECT * FROM otps
-            WHERE email = ? AND purpose = ? AND consumed = 0
+            WHERE LOWER(email) = ? AND purpose = ? AND consumed = 0
             ORDER BY id DESC LIMIT 1;
             """,
             (clean_email, purpose),
         )
         row = cur.fetchone()
         if not row:
-            return False, "No active verification code found. Please request a new code."
+            return (
+                False,
+                "No active verification code found. Please request a new code.",
+            )
 
         otp_id = row["id"]
         salt = row["salt"]
@@ -402,8 +573,10 @@ def verify_and_consume_otp(
         # Check expiration
         if now_dt > expires_dt:
             with conn:
-                conn.execute(
-                    "UPDATE otps SET consumed = 1 WHERE id = ?;", (otp_id,)
+                _exec(
+                    conn,
+                    "UPDATE otps SET consumed = 1 WHERE id = ?;",
+                    (otp_id,),
                 )
             return (
                 False,
@@ -413,8 +586,10 @@ def verify_and_consume_otp(
         # Check attempts lockout
         if attempts >= max_attempts:
             with conn:
-                conn.execute(
-                    "UPDATE otps SET consumed = 1 WHERE id = ?;", (otp_id,)
+                _exec(
+                    conn,
+                    "UPDATE otps SET consumed = 1 WHERE id = ?;",
+                    (otp_id,),
                 )
             return (
                 False,
@@ -428,8 +603,10 @@ def verify_and_consume_otp(
 
         if hmac.compare_digest(computed_hash, expected_hash):
             with conn:
-                conn.execute(
-                    "UPDATE otps SET consumed = 1 WHERE id = ?;", (otp_id,)
+                _exec(
+                    conn,
+                    "UPDATE otps SET consumed = 1 WHERE id = ?;",
+                    (otp_id,),
                 )
             return True, "Verification successful."
 
@@ -437,7 +614,8 @@ def verify_and_consume_otp(
         new_attempts = attempts + 1
         with conn:
             if new_attempts >= max_attempts:
-                conn.execute(
+                _exec(
+                    conn,
                     "UPDATE otps SET attempts = ?, consumed = 1 WHERE id = ?;",
                     (new_attempts, otp_id),
                 )
@@ -446,7 +624,8 @@ def verify_and_consume_otp(
                     "Invalid verification code. Maximum attempts exceeded. Please request a new code.",
                 )
             else:
-                conn.execute(
+                _exec(
+                    conn,
                     "UPDATE otps SET attempts = ? WHERE id = ?;",
                     (new_attempts, otp_id),
                 )
@@ -477,15 +656,16 @@ def check_rate_limit(
 
     conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute(
+        cur = _exec(
+            conn,
             """
             SELECT COUNT(*) AS cnt FROM otps
-            WHERE email = ? AND purpose = ? AND created_at >= ?;
+            WHERE LOWER(email) = ? AND purpose = ? AND created_at >= ?;
             """,
             (clean_email, purpose, window_start),
         )
-        count = cur.fetchone()["cnt"]
+        row = cur.fetchone()
+        count = row["cnt"] if isinstance(row, dict) else row[0]
         if count >= max_requests:
             return (
                 False,
@@ -511,7 +691,8 @@ def log_delivery(
     conn = get_connection()
     try:
         with conn:
-            conn.execute(
+            _exec(
+                conn,
                 """
                 INSERT INTO delivery_logs (timestamp, recipient, purpose, status, provider, error_message)
                 VALUES (?, ?, ?, ?, ?, ?);
@@ -533,9 +714,10 @@ def get_delivery_logs(limit: int = 20) -> list:
     """Fetch recent email delivery audit logs."""
     conn = get_connection()
     try:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT * FROM delivery_logs ORDER BY id DESC LIMIT ?;", (limit,)
+        cur = _exec(
+            conn,
+            "SELECT * FROM delivery_logs ORDER BY id DESC LIMIT ?;",
+            (limit,),
         )
         return [dict(row) for row in cur.fetchall()]
     finally:
