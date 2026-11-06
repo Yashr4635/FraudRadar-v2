@@ -22,6 +22,13 @@ def generate_pkce_pair():
 
 load_dotenv()
 
+from fraudradar_ai_scam_detection_v2.services import (
+    auth_db,
+    otp_service,
+    EmailService,
+    mask_email,
+)
+
 try:
     from supabase import create_client, Client
 except Exception:
@@ -292,6 +299,12 @@ class AuthState(rx.State):
     resend_cooldown: int = 0
     can_resend: bool = True
 
+    @rx.var(cache=True)
+    def masked_otp_email(self) -> str:
+        if not self.otp_email:
+            return ""
+        return mask_email(self.otp_email)
+
     @rx.event
     def toggle_password_login(self):
         self.show_password_login = not self.show_password_login
@@ -473,43 +486,71 @@ class AuthState(rx.State):
         if len(self.login_password) < 6:
             self.auth_error = "Password must be at least 6 characters."
             return
-        sb = get_supabase()
-        if sb is None:
-            self.auth_error = (
-                "Authentication service is not configured. "
-                "Please contact your administrator."
-            )
-            return
+
         self.loading = True
-        try:
-            resp = sb.auth.sign_in_with_password(
-                {"email": email, "password": self.login_password}
-            )
-            if resp and resp.user:
-                self._apply_user_session(resp.user, resp.session, "email")
-                self.auth_success = "Welcome back!"
-                self.loading = False
-                self._sync_profile_safe()
-                return rx.redirect("/dashboard")
-            else:
-                self.auth_error = "Invalid email or password."
-        except Exception as e:
-            msg = str(e).lower()
-            if "not confirmed" in msg or "email not confirmed" in msg:
+
+        # 1. Check local verified user database
+        local_user = auth_db.get_user_by_email(email)
+        if local_user and local_user.get("password_hash") and auth_db.verify_password(self.login_password, local_user["password_hash"]):
+            if not local_user.get("is_verified"):
                 self.otp_email = email
                 self.otp_type = "signup"
                 self.show_otp_view = True
                 self.auth_error = ""
-                self.auth_success = f"Please enter the verification code sent to {email} to activate your account."
+                masked = mask_email(email)
+                self.auth_success = f"Please enter the 8-digit verification code sent to {masked} to activate your account."
                 self.loading = False
                 return AuthState.start_resend_countdown
-            if _is_expected_auth_error(e):
-                logging.warning(
-                    f"Expected auth validation/rate-limit in login: {e}"
+
+            auth_db.update_last_login(email)
+            token = otp_service.create_user_jwt(local_user)
+            self._apply_user_session(
+                {"id": local_user["id"], "email": local_user["email"], "user_metadata": {"full_name": local_user["full_name"]}},
+                None,
+                "email",
+                fallback_name=local_user["full_name"],
+            )
+            self.access_token = token
+            self.refresh_token = token
+            self.auth_success = "Welcome back!"
+            self.loading = False
+            self._sync_profile_safe()
+            return rx.redirect("/dashboard")
+
+        # 2. Check Supabase as fallback
+        sb = get_supabase()
+        if sb is not None:
+            try:
+                resp = sb.auth.sign_in_with_password(
+                    {"email": email, "password": self.login_password}
                 )
-            else:
-                logging.exception(f"Login error: {e}")
-            self.auth_error = _friendly_auth_error(e, "login")
+                if resp and resp.user:
+                    self._apply_user_session(resp.user, resp.session, "email")
+                    self.auth_success = "Welcome back!"
+                    self.loading = False
+                    self._sync_profile_safe()
+                    return rx.redirect("/dashboard")
+            except Exception as e:
+                msg = str(e).lower()
+                if "not confirmed" in msg or "email not confirmed" in msg:
+                    self.otp_email = email
+                    self.otp_type = "signup"
+                    self.show_otp_view = True
+                    self.auth_error = ""
+                    self.auth_success = f"Please enter the verification code sent to {email} to activate your account."
+                    self.loading = False
+                    return AuthState.start_resend_countdown
+                if _is_expected_auth_error(e):
+                    logging.warning(
+                        f"Expected auth validation/rate-limit in login: {e}"
+                    )
+                else:
+                    logging.exception(f"Login error: {e}")
+                self.auth_error = _friendly_auth_error(e, "login")
+                self.loading = False
+                return
+
+        self.auth_error = "Invalid email or password."
         self.loading = False
 
     @rx.event
@@ -533,7 +574,7 @@ class AuthState(rx.State):
             self.auth_error = "Please enter your email address first."
             return
         self.otp_email = email
-        self.otp_type = "email"
+        self.otp_type = "login"
         return self.send_login_otp()
 
     @rx.event
@@ -546,36 +587,56 @@ class AuthState(rx.State):
         if not email or "@" not in email or "." not in email:
             self.auth_error = "Please enter a valid email address."
             return
-        sb = get_supabase()
-        if sb is None:
-            self.auth_error = "Authentication service is not configured."
-            return
+
         self.otp_loading = True
         self.auth_error = ""
         self.auth_success = ""
         self.otp_error = ""
-        try:
-            sb.auth.sign_in_with_otp({
-                "email": email,
-                "options": {
-                    "should_create_user": False
-                }
-            })
-            self.otp_email = email
-            self.otp_type = "email"
-            self.show_otp_view = True
-            self.otp_code = ""
-            self.auth_success = f"Verification code sent to {email}. Please enter the 8-digit code below."
-            return AuthState.start_resend_countdown
-        except Exception as e:
-            logging.exception(f"Send OTP error: {e}")
-            msg = str(e).lower()
-            if "signups not allowed" in msg or "not found" in msg or "user not found" in msg:
-                self.auth_error = "No account found with this email. Please create an account first."
-            else:
-                self.auth_error = _friendly_auth_error(e, "send verification code")
-        finally:
+
+        # Step 4: Backend checks account status.
+        # Unknown/unregistered email addresses receive a safe message without creating accounts.
+        user = auth_db.get_user_by_email(email)
+
+        # Also check Supabase profile if local db doesn't have it yet
+        sb = get_supabase()
+        if not user and sb is not None:
+            try:
+                res = sb.table(PROFILES_TABLE).select("id, email, full_name").eq("email", email).execute()
+                if res and res.data and len(res.data) > 0:
+                    sb_u = res.data[0]
+                    user = auth_db.create_user(
+                        email=email,
+                        full_name=sb_u.get("full_name") or email.split("@")[0].title(),
+                        is_verified=True,
+                    )
+            except Exception:
+                pass
+
+        if not user or not user.get("is_verified"):
             self.otp_loading = False
+            self.auth_error = "No account found with this email. Please create an account first."
+            self.show_otp_view = False
+            return
+
+        # Generate & send cryptographically secure 8-digit OTP
+        ok, msg, masked = otp_service.send_auth_otp(
+            email=email,
+            purpose="login",
+            recipient_name=user.get("full_name", ""),
+        )
+
+        self.otp_loading = False
+        if not ok:
+            self.auth_error = msg
+            self.show_otp_view = False
+            return
+
+        self.otp_email = email
+        self.otp_type = "login"
+        self.show_otp_view = True
+        self.otp_code = ""
+        self.auth_success = f"Verification code sent to {masked}. Please enter the 8-digit code below."
+        return AuthState.start_resend_countdown
 
     @rx.event
     def verify_email_otp(self, form_data: dict = None):
@@ -593,106 +654,127 @@ class AuthState(rx.State):
         if not code:
             self.otp_error = "Please enter the 8-digit verification code."
             return
+
         import re as _re
         clean_code = _re.sub(r"\D", "", code)
-        if len(clean_code) < 4 or len(clean_code) > 12:
+        if len(clean_code) != 8:
             self.otp_error = "Please enter a valid verification code (8 digits)."
             return
-        code = clean_code
 
-        sb = get_supabase()
-        if sb is None:
-            self.otp_error = "Authentication service is not configured."
-            return
         self.otp_loading = True
         self.otp_error = ""
-        try:
-            candidate_types = [self.otp_type] if self.otp_type else []
-            for t in ["email", "magiclink", "signup"]:
-                if t not in candidate_types:
-                    candidate_types.append(t)
-            
-            result = None
-            last_err = None
-            for ot in candidate_types:
-                try:
-                    result = sb.auth.verify_otp({
-                        "email": email,
-                        "token": code,
-                        "type": ot,
-                    })
-                    if result and getattr(result, "user", None):
-                        break
-                except Exception as ex:
-                    last_err = ex
-                    continue
 
-            if (not result or not getattr(result, "user", None)) and last_err:
-                raise last_err
+        purpose = self.otp_type or "login"
+        ok, msg = otp_service.verify_auth_otp(
+            email=email,
+            purpose=purpose,
+            code=clean_code,
+        )
 
-            if result and getattr(result, "user", None):
-                user = result.user
-                session = getattr(result, "session", None)
-                provider = self._extract_provider(user)
-                self._apply_user_session(
-                    user,
-                    session,
-                    provider,
-                    fallback_name=self.signup_name,
-                )
-                self.auth_success = "Email verified successfully!"
-                self.show_otp_view = False
-                self.otp_code = ""
-                self._sync_profile_safe()
-                return rx.redirect("/dashboard")
-            else:
-                self.otp_error = "Invalid or expired verification code."
-        except Exception as e:
-            logging.exception(f"Verify OTP error: {e}")
-            msg = str(e).lower()
-            if "expired" in msg or "invalid" in msg or "token" in msg:
-                self.otp_error = "Invalid or expired verification code. Please request a new one."
-            else:
-                self.otp_error = _friendly_auth_error(e, "verification")
-        finally:
+        # Fallback to Supabase verify_otp if local verify fails and Supabase is configured
+        if not ok:
+            sb = get_supabase()
+            if sb is not None:
+                candidate_types = [purpose]
+                for t in ["email", "magiclink", "signup"]:
+                    if t not in candidate_types:
+                        candidate_types.append(t)
+                for ot in candidate_types:
+                    try:
+                        result = sb.auth.verify_otp({
+                            "email": email,
+                            "token": clean_code,
+                            "type": ot,
+                        })
+                        if result and getattr(result, "user", None):
+                            ok = True
+                            user_sb = result.user
+                            session_sb = getattr(result, "session", None)
+                            self._apply_user_session(
+                                user_sb,
+                                session_sb,
+                                "email",
+                                fallback_name=self.signup_name,
+                            )
+                            break
+                    except Exception:
+                        continue
+
+        if not ok:
             self.otp_loading = False
+            self.otp_error = msg
+            return
+
+        # Verification succeeded!
+        if purpose == "signup":
+            user = auth_db.commit_pending_signup(email)
+        else:
+            user = auth_db.get_user_by_email(email)
+            if not user:
+                user = auth_db.create_user(
+                    email=email,
+                    full_name=self.signup_name.strip() or email.split("@")[0].title(),
+                    is_verified=True,
+                )
+            else:
+                auth_db.mark_user_verified(email)
+                auth_db.update_last_login(email)
+
+        token = otp_service.create_user_jwt(user)
+
+        self._apply_user_session(
+            user={
+                "id": user["id"],
+                "email": user["email"],
+                "user_metadata": {"full_name": user["full_name"]},
+            },
+            session=None,
+            provider=user.get("provider", "email"),
+            fallback_name=user["full_name"],
+        )
+        self.access_token = token
+        self.refresh_token = token
+
+        self.auth_success = "Email verified successfully! Welcome to FraudRadar."
+        self.show_otp_view = False
+        self.otp_code = ""
+        self.otp_error = ""
+        self.otp_loading = False
+        self._sync_profile_safe()
+        return rx.redirect("/dashboard")
 
     @rx.event
     def resend_otp_code(self):
         if not self.can_resend or self.otp_loading:
             return
         email = (self.otp_email or self.login_email or self.signup_email).strip().lower()
-        if not email:
+        if not email or "@" not in email:
             self.otp_error = "Email address is missing."
             return
-        sb = get_supabase()
-        if sb is None:
-            self.otp_error = "Authentication service is not configured."
-            return
+
         self.otp_loading = True
         self.otp_error = ""
-        try:
-            otp_type = self.otp_type or "email"
-            if otp_type == "signup":
-                try:
-                    sb.auth.resend({
-                        "type": "signup",
-                        "email": email,
-                    })
-                except Exception:
-                    sb.auth.sign_in_with_otp({"email": email})
-            else:
-                sb.auth.sign_in_with_otp({
-                    "email": email,
-                    "options": {"should_create_user": False}
-                })
-            self.auth_success = f"A new 8-digit verification code has been sent to {email}."
-            return AuthState.start_resend_countdown
-        except Exception as e:
-            logging.exception(f"Resend OTP error: {e}")
-            self.otp_error = _friendly_auth_error(e, "resend code")
-        finally:
-            self.otp_loading = False
+
+        purpose = self.otp_type or "login"
+        name = self.signup_name
+        if not name:
+            u = auth_db.get_user_by_email(email)
+            if u:
+                name = u.get("full_name", "")
+
+        ok, msg, masked = otp_service.send_auth_otp(
+            email=email,
+            purpose=purpose,
+            recipient_name=name,
+        )
+
+        self.otp_loading = False
+        if not ok:
+            self.otp_error = msg
+            return
+
+        self.auth_success = f"A new 8-digit verification code has been sent to {masked}."
+        return AuthState.start_resend_countdown
 
     @rx.event
     def login_with_google(self):
@@ -764,7 +846,8 @@ class AuthState(rx.State):
         if not self.signup_name.strip():
             self.auth_error = "Please enter your name."
             return
-        if not self.signup_email or "@" not in self.signup_email:
+        email = (self.signup_email or "").strip().lower()
+        if not email or "@" not in email or "." not in email:
             self.auth_error = "Please enter a valid email."
             return
         if len(self.signup_password) < 6:
@@ -776,56 +859,42 @@ class AuthState(rx.State):
         if not self.accept_terms:
             self.auth_error = "Please accept the terms to continue."
             return
-        sb = get_supabase()
-        if sb is None:
-            self.auth_error = (
-                "Authentication service is not configured. "
-                "Please contact your administrator."
-            )
-            return
+
         self.loading = True
-        try:
-            callback_url = get_auth_callback_url()
-            resp = sb.auth.sign_up(
-                {
-                    "email": self.signup_email,
-                    "password": self.signup_password,
-                    "options": {
-                        "data": {"full_name": self.signup_name},
-                    },
-                }
-            )
-            if resp and resp.user:
-                if not resp.session:
-                    self.otp_email = self.signup_email
-                    self.otp_type = "signup"
-                    self.show_otp_view = True
-                    self.auth_success = f"Account created! We've sent an 8-digit confirmation code to {self.signup_email}."
-                    self.loading = False
-                    return
-                self._apply_user_session(
-                    resp.user,
-                    resp.session,
-                    "email",
-                    fallback_name=self.signup_name,
-                )
-                self.auth_success = "Account created successfully!"
-                self.loading = False
-                self._sync_profile_safe()
-                if resp.session:
-                    return rx.redirect("/dashboard")
-                return rx.redirect("/login")
-            else:
-                self.auth_error = "Signup failed. Please try again."
-        except Exception as e:
-            if _is_expected_auth_error(e):
-                logging.warning(
-                    f"Expected auth validation/rate-limit in signup: {e}"
-                )
-            else:
-                logging.exception(f"Signup error: {e}")
-            self.auth_error = _friendly_auth_error(e, "signup")
+
+        # Check for duplicate verified account
+        existing = auth_db.get_user_by_email(email)
+        if existing and existing.get("is_verified"):
+            self.loading = False
+            self.auth_error = "An account with this email already exists. Please sign in."
+            return
+
+        # Store pending registration details until OTP confirmation
+        auth_db.store_pending_signup(
+            email=email,
+            full_name=self.signup_name.strip(),
+            password=self.signup_password,
+        )
+
+        # Generate and dispatch cryptographically secure 8-digit OTP
+        ok, msg, masked = otp_service.send_auth_otp(
+            email=email,
+            purpose="signup",
+            recipient_name=self.signup_name.strip(),
+        )
+
         self.loading = False
+        if not ok:
+            self.auth_error = msg
+            self.show_otp_view = False
+            return
+
+        self.otp_email = email
+        self.otp_type = "signup"
+        self.show_otp_view = True
+        self.otp_code = ""
+        self.auth_success = f"Account registered! We've sent an 8-digit verification code to {masked}."
+        return AuthState.start_resend_countdown
 
     @rx.event
     def logout(self):
@@ -1138,8 +1207,20 @@ class AuthState(rx.State):
         if self.is_authenticated and self.user_id:
             return True
         token = str(self.access_token or "").strip()
+        if not token:
+            return False
 
-        # 1. Fast in-memory token cache lookup (0ms)
+        # 1. High-speed signed JWT session verification (0ms)
+        jwt_payload = otp_service.verify_user_jwt(token)
+        if jwt_payload:
+            self.is_authenticated = True
+            self.user_id = jwt_payload.get("sub", "")
+            self.user_email = jwt_payload.get("email", "")
+            self.user_name = jwt_payload.get("name", "User")
+            self.user_provider = jwt_payload.get("provider", "email")
+            return True
+
+        # 2. Fast in-memory token cache lookup (0ms)
         import time as _time
         now = _time.time()
         if token and token in _AUTH_TOKEN_CACHE:

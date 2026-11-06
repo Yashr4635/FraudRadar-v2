@@ -1,5 +1,6 @@
 import logging
 import datetime
+import asyncio
 import reflex as rx
 from fraudradar_ai_scam_detection_v2.states.auth_state import AuthState, get_supabase, PROFILES_TABLE
 
@@ -43,13 +44,15 @@ class ProfileState(rx.State):
         sb = get_supabase()
         if sb is not None and auth.user_id:
             try:
-                resp = (
-                    sb.table(PROFILES_TABLE)
-                    .select("*")
-                    .eq("id", auth.user_id)
-                    .limit(1)
-                    .execute()
-                )
+                def _fetch():
+                    return (
+                        sb.table(PROFILES_TABLE)
+                        .select("*")
+                        .eq("id", auth.user_id)
+                        .limit(1)
+                        .execute()
+                    )
+                resp = await asyncio.to_thread(_fetch)
                 rows = getattr(resp, "data", None) or []
                 if rows:
                     row = rows[0]
@@ -72,7 +75,7 @@ class ProfileState(rx.State):
                 if "PGRST205" in msg or "Could not find the table" in msg:
                     logging.debug("profiles table missing; skipping load")
                 else:
-                    logging.exception(f"profile load: {e}")
+                    logging.warning(f"profile load notice: {e}")
         self.initialized = True
 
     @rx.event
@@ -197,13 +200,13 @@ class ProfileState(rx.State):
                 "provider": auth.user_provider,
             }
             try:
-                sb.table(PROFILES_TABLE).upsert(payload).execute()
+                await asyncio.to_thread(lambda: sb.table(PROFILES_TABLE).upsert(payload).execute())
             except Exception as e:
                 msg = str(e)
                 if "PGRST205" in msg or "Could not find the table" in msg:
                     logging.debug("profiles table missing; skipping save")
                 else:
-                    logging.exception(f"profile upsert: {e}")
+                    logging.warning(f"profile upsert notice: {e}")
         yield rx.toast.success("Profile updated.")
 
     @rx.event

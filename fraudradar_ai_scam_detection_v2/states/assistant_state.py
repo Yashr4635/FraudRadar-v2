@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 import reflex as rx
 from typing import TypedDict
 
@@ -168,7 +169,7 @@ class AssistantState(rx.State):
         )
 
     @rx.event
-    def send_message(self, form_data: dict):
+    async def send_message(self, form_data: dict):
         msg = (form_data.get("message") or "").strip()
         if not msg or self.is_thinking:
             return
@@ -180,14 +181,16 @@ class AssistantState(rx.State):
 
         history = list(self.messages)
         try:
-            reply = self._get_reply(history)
-        except Exception as e:
-            logging.exception(f"Assistant top-level error: {e}")
-            reply = GENERIC_FALLBACK
+            try:
+                reply = await asyncio.to_thread(self._get_reply, history)
+            except Exception as e:
+                logging.exception(f"Assistant top-level error: {e}")
+                reply = GENERIC_FALLBACK
 
-        if not reply or not reply.strip():
-            reply = GENERIC_FALLBACK
+            if not reply or not reply.strip():
+                reply = GENERIC_FALLBACK
 
-        self.messages.append({"role": "assistant", "content": reply})
-        self.is_thinking = False
-        yield self._scroll_chat_to_bottom()
+            self.messages.append({"role": "assistant", "content": reply})
+        finally:
+            self.is_thinking = False
+            yield self._scroll_chat_to_bottom()

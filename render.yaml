@@ -19,3 +19,17 @@ services:
         sync: false
       - key: GOOGLE_SAFE_BROWSING_API_KEY
         sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: FraudRadar Scam Defense
+      - key: JWT_SECRET
+        generateValue: true

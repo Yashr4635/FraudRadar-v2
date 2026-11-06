@@ -180,7 +180,7 @@ class DashboardState(rx.State):
         ]
         self.unread_count = 0
 
-    @rx.var
+    @rx.var(cache=True)
     async def weekly_data(self) -> list[WeeklyPoint]:
         """Derive last-7-day scan/threat activity from real scan history."""
         try:
@@ -219,15 +219,15 @@ class DashboardState(rx.State):
             )
         return out
 
-    @rx.var
+    @rx.var(cache=True)
     def current_date(self) -> str:
         return datetime.datetime.now().strftime("%A, %B %d, %Y")
 
-    @rx.var
+    @rx.var(cache=True)
     def current_time(self) -> str:
         return datetime.datetime.now().strftime("%I:%M %p")
 
-    @rx.var
+    @rx.var(cache=True)
     def greeting(self) -> str:
         h = datetime.datetime.now().hour
         if h < 12:
@@ -236,7 +236,7 @@ class DashboardState(rx.State):
             return "Good Afternoon"
         return "Good Evening"
 
-    @rx.var
+    @rx.var(cache=True)
     def selected_tip(self) -> dict[str, str]:
         if 0 <= self.current_tip < len(self.tips):
             return self.tips[self.current_tip]

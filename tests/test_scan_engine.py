@@ -344,5 +344,30 @@ class TestSafeOverridePrevention(unittest.TestCase):
         self.assertFalse(_is_safe_notification(msg))
 
 
+class TestScanOptimizationAndFormSubmission(unittest.IsolatedAsyncioTestCase):
+    """Test suite verifying typing optimization, sample loading, and native form submission."""
+
+    def setUp(self):
+        self.state = ScanState(_reflex_internal_init=True)
+
+    def test_set_sample_loads_prompt_and_clears_error(self):
+        self.state.error = "Old error"
+        self.state.has_result = True
+        self.state.set_sample("Suspicious test text", "text")
+        self.assertEqual(self.state.input_text, "Suspicious test text")
+        self.assertEqual(self.state.input_type, "text")
+        self.assertEqual(self.state.error, "")
+        self.assertFalse(self.state.has_result)
+
+    def test_handle_submit_with_empty_text_sets_error(self):
+        self.state.handle_submit({"input_text": "   "})
+        self.assertEqual(self.state.error, "Please enter content to analyze.")
+
+    def test_handle_submit_captures_phone_and_url_field(self):
+        self.state.input_type = "phone"
+        self.state.handle_submit({"input_phone": "+91 9876543210"})
+        self.assertEqual(self.state.input_text, "+91 9876543210")
+
+
 if __name__ == "__main__":
     unittest.main()

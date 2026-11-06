@@ -809,7 +809,15 @@ class ScanState(rx.State):
             filename=f"fraudradar_report_{rec['id']}_{ts}.txt",
         )
 
-    @rx.var
+    @rx.event
+    def set_sample(self, text: str, sample_type: str = "text"):
+        """Load a curated scam or safety sample for quick testing and demonstration."""
+        self.input_text = text
+        self.input_type = sample_type
+        self.error = ""
+        self.has_result = False
+
+    @rx.var(cache=True)
     def filtered_history(self) -> list[ScanRecord]:
         items = list(self.history)
         if self.filter_verdict != "All":
@@ -831,25 +839,37 @@ class ScanState(rx.State):
             items = list(reversed(items))
         return items
 
-    @rx.var
+    @rx.var(cache=True)
     def total_scans(self) -> int:
         return len(self.history)
 
-    @rx.var
+    @rx.var(cache=True)
     def scams_detected(self) -> int:
         return len([h for h in self.history if h["verdict"] == "HIGH"])
 
-    @rx.var
+    @rx.var(cache=True)
     def avg_risk(self) -> float:
         if not self.history:
             return 0.0
         return sum(h["risk_score"] for h in self.history) / len(self.history)
 
-    @rx.var
+    @rx.var(cache=True)
     def latest_verdict(self) -> str:
         if self.history:
             return self.history[0]["verdict"]
         return "—"
+
+    @rx.event
+    def handle_submit(self, form_data: dict):
+        """Native form submit handler that captures input instantly from the DOM."""
+        text = (
+            form_data.get("input_text")
+            or form_data.get("input_phone")
+            or form_data.get("input_url")
+            or self.input_text
+            or ""
+        )
+        return self.start_analysis(str(text), self.input_type)
 
     @rx.event
     def start_analysis(self, text: str = "", input_type: str = ""):
@@ -857,7 +877,9 @@ class ScanState(rx.State):
         analysis_text = text if text else self.input_text
         analysis_type = input_type if input_type else self.input_type
 
-        if not analysis_text.strip():
+        analysis_text = str(analysis_text or "").strip()
+
+        if not analysis_text:
             self.error = "Please enter content to analyze."
             return
         if len(analysis_text) > 5000:
@@ -878,9 +900,11 @@ class ScanState(rx.State):
 
         if not analysis_text.strip():
             self.error = "Please enter content to analyze."
+            self.is_analyzing = False
             return
         if len(analysis_text) > 5000:
             self.error = "Input too long (max 5000 chars)."
+            self.is_analyzing = False
             return
 
         self.is_analyzing = True
@@ -889,186 +913,188 @@ class ScanState(rx.State):
         self.input_text = analysis_text
         self.input_type = analysis_type
 
-        # Pre-extract candidate URLs immediately for concurrent checking
-        extracted = self._extract_threats(analysis_text)
-        all_urls_for_check = list(dict.fromkeys(
-            extracted.get("links", []) + extracted.get("urls", [])
-        ))
-        if analysis_type == "url" and analysis_text.strip():
-            raw_url = analysis_text.strip()
-            if not raw_url.startswith(("http://", "https://")):
-                raw_url = "http://" + raw_url
-            if raw_url not in all_urls_for_check:
-                all_urls_for_check.insert(0, raw_url)
-
-        any_api_configured = any(
-            os.getenv(k)
-            for k in ("GOOGLE_SAFE_BROWSING_API_KEY", "VIRUSTOTAL_API_KEY", "PHISHTANK_API_KEY")
-        )
-
-        # ── Parallel Execution: Groq LLM + External API checks ────────
         try:
-            if all_urls_for_check and any_api_configured:
-                llm_task = asyncio.to_thread(self._analyze_sync, analysis_text, analysis_type)
-                ext_task = asyncio.to_thread(check_urls_external, all_urls_for_check)
-                result, ext_results = await asyncio.gather(llm_task, ext_task)
-            else:
-                result = await asyncio.to_thread(self._analyze_sync, analysis_text, analysis_type)
+            # Pre-extract candidate URLs immediately for concurrent checking
+            extracted = self._extract_threats(analysis_text)
+            all_urls_for_check = list(dict.fromkeys(
+                extracted.get("links", []) + extracted.get("urls", [])
+            ))
+            if analysis_type == "url" and analysis_text.strip():
+                raw_url = analysis_text.strip()
+                if not raw_url.startswith(("http://", "https://")):
+                    raw_url = "http://" + raw_url
+                if raw_url not in all_urls_for_check:
+                    all_urls_for_check.insert(0, raw_url)
+
+            any_api_configured = any(
+                os.getenv(k)
+                for k in ("GOOGLE_SAFE_BROWSING_API_KEY", "VIRUSTOTAL_API_KEY", "PHISHTANK_API_KEY")
+            )
+
+            # ── Parallel Execution: Groq LLM + External API checks ────────
+            try:
+                if all_urls_for_check and any_api_configured:
+                    llm_task = asyncio.to_thread(self._analyze_sync, analysis_text, analysis_type)
+                    ext_task = asyncio.to_thread(check_urls_external, all_urls_for_check)
+                    result, ext_results = await asyncio.gather(llm_task, ext_task)
+                else:
+                    result = await asyncio.to_thread(self._analyze_sync, analysis_text, analysis_type)
+                    ext_results = []
+            except Exception as e:
+                logging.exception(f"Analyze unexpected: {e}")
+                result = self._heuristic_fallback(analysis_text)
                 ext_results = []
-        except Exception as e:
-            logging.exception(f"Analyze unexpected: {e}")
-            result = self._heuristic_fallback(analysis_text)
-            ext_results = []
 
-        try:
-            self.risk_score = max(0, min(100, int(result.get("risk_score", 0))))
-        except Exception:
-            self.risk_score = 0
-        try:
-            self.confidence = max(0, min(100, int(result.get("confidence", 80))))
-        except Exception:
-            self.confidence = 80
+            try:
+                self.risk_score = max(0, min(100, int(result.get("risk_score", 0))))
+            except Exception:
+                self.risk_score = 0
+            try:
+                self.confidence = max(0, min(100, int(result.get("confidence", 80))))
+            except Exception:
+                self.confidence = 80
 
-        self.verdict = _normalize_verdict(result.get("verdict", ""), self.risk_score)
-        self.summary = (result.get("summary") or "").strip() or f"{self.verdict} risk detected."
-        self.explanation = result.get("explanation") or "Analysis completed."
+            self.verdict = _normalize_verdict(result.get("verdict", ""), self.risk_score)
+            self.summary = (result.get("summary") or "").strip() or f"{self.verdict} risk detected."
+            self.explanation = result.get("explanation") or "Analysis completed."
 
-        def _str_list(v) -> list[str]:
-            if isinstance(v, list):
-                return [str(x) for x in v if x is not None]
-            return []
+            def _str_list(v) -> list[str]:
+                if isinstance(v, list):
+                    return [str(x) for x in v if x is not None]
+                return []
 
-        self.categories = _str_list(result.get("categories"))
-        self.red_flags = _str_list(result.get("red_flags"))
-        self.actions = _str_list(result.get("actions"))
-        self.checklist = _str_list(result.get("checklist")) or [
-            "Do not share OTP, PIN, or CVV with anyone",
-            "Verify the sender through official channels",
-            "Avoid clicking unknown links",
-            "Report to 1930 if you suspect fraud",
-        ]
-        self.entities = _str_list(result.get("entities"))
+            self.categories = _str_list(result.get("categories"))
+            self.red_flags = _str_list(result.get("red_flags"))
+            self.actions = _str_list(result.get("actions"))
+            self.checklist = _str_list(result.get("checklist")) or [
+                "Do not share OTP, PIN, or CVV with anyone",
+                "Verify the sender through official channels",
+                "Avoid clicking unknown links",
+                "Report to 1930 if you suspect fraud",
+            ]
+            self.entities = _str_list(result.get("entities"))
 
-        kws_raw = result.get("keywords") or []
-        kws: list[KeywordHit] = []
-        if isinstance(kws_raw, list):
-            for k in kws_raw:
-                if isinstance(k, dict) and k.get("term"):
-                    kws.append({
-                        "term": str(k.get("term", "")),
-                        "risk": str(k.get("risk", "medium")).lower(),
-                        "reason": str(k.get("reason", "")),
-                    })
-                elif isinstance(k, str):
-                    kws.append({"term": k, "risk": "medium", "reason": ""})
-        self.keywords = kws
+            kws_raw = result.get("keywords") or []
+            kws: list[KeywordHit] = []
+            if isinstance(kws_raw, list):
+                for k in kws_raw:
+                    if isinstance(k, dict) and k.get("term"):
+                        kws.append({
+                            "term": str(k.get("term", "")),
+                            "risk": str(k.get("risk", "medium")).lower(),
+                            "reason": str(k.get("reason", "")),
+                        })
+                    elif isinstance(k, str):
+                        kws.append({"term": k, "risk": "medium", "reason": ""})
+            self.keywords = kws
 
-        tb_raw = result.get("threat_breakdown") or {}
-        if not isinstance(tb_raw, dict):
-            tb_raw = {}
-        breakdown: ThreatBreakdown = {
-            "links": _str_list(tb_raw.get("links")),
-            "urls": _str_list(tb_raw.get("urls")),
-            "phones": _str_list(tb_raw.get("phones")),
-            "emails": _str_list(tb_raw.get("emails")),
-            "suspicious_domains": _str_list(tb_raw.get("suspicious_domains")),
-            "money_requests": _str_list(tb_raw.get("money_requests")),
-            "urgency": _str_list(tb_raw.get("urgency")),
-            "social_engineering": _str_list(tb_raw.get("social_engineering")),
-        }
-        for key in ("links", "urls", "phones", "emails"):
-            for v in extracted[key]:
-                if v not in breakdown[key]:
-                    breakdown[key].append(v)
-        self.threat_breakdown = breakdown
-        self.contributions = self._build_contributions(
-            analysis_text, breakdown, self.keywords, analysis_type
-        )
+            tb_raw = result.get("threat_breakdown") or {}
+            if not isinstance(tb_raw, dict):
+                tb_raw = {}
+            breakdown: ThreatBreakdown = {
+                "links": _str_list(tb_raw.get("links")),
+                "urls": _str_list(tb_raw.get("urls")),
+                "phones": _str_list(tb_raw.get("phones")),
+                "emails": _str_list(tb_raw.get("emails")),
+                "suspicious_domains": _str_list(tb_raw.get("suspicious_domains")),
+                "money_requests": _str_list(tb_raw.get("money_requests")),
+                "urgency": _str_list(tb_raw.get("urgency")),
+                "social_engineering": _str_list(tb_raw.get("social_engineering")),
+            }
+            for key in ("links", "urls", "phones", "emails"):
+                for v in extracted[key]:
+                    if v not in breakdown[key]:
+                        breakdown[key].append(v)
+            self.threat_breakdown = breakdown
+            self.contributions = self._build_contributions(
+                analysis_text, breakdown, self.keywords, analysis_type
+            )
 
-        # ── Apply external API cross-verification results ────────────
-        for ext in ext_results:
-            if ext.get("is_flagged"):
-                flagged_apis = ", ".join(ext["flagged_by"])
-                self.risk_score = max(self.risk_score, 85)
-                self.verdict = "HIGH"
-                self.confidence = max(self.confidence, 92)
-                self.contributions.append({
-                    "label": f"Flagged by {flagged_apis}",
-                    "points": 40,
-                    "icon": "shield-x",
-                    "detail": (
-                        f"URL '{ext['url']}' was confirmed dangerous by: "
-                        f"{flagged_apis}. This is a verified threat."
-                    ),
-                })
-                flag_msg = f"Confirmed threat: {ext['url']} (flagged by {flagged_apis})"
-                if flag_msg not in self.red_flags:
-                    self.red_flags.append(flag_msg)
-            elif ext.get("is_safe"):
-                url_info = analyze_url(ext["url"])
-                if not url_info.get("tld_suspicious") and not url_info.get("is_shortener") and not url_info.get("is_ip"):
-                    checked_apis = ", ".join(ext.get("safe_by", []))
+            # ── Apply external API cross-verification results ────────────
+            for ext in ext_results:
+                if ext.get("is_flagged"):
+                    flagged_apis = ", ".join(ext["flagged_by"])
+                    self.risk_score = max(self.risk_score, 85)
+                    self.verdict = "HIGH"
+                    self.confidence = max(self.confidence, 92)
                     self.contributions.append({
-                        "label": "External APIs: Clear",
-                        "points": -10,
-                        "icon": "shield-check",
+                        "label": f"Flagged by {flagged_apis}",
+                        "points": 40,
+                        "icon": "shield-x",
                         "detail": (
-                            f"URL '{ext['url']}' was verified clean by: {checked_apis}."
+                            f"URL '{ext['url']}' was confirmed dangerous by: "
+                            f"{flagged_apis}. This is a verified threat."
                         ),
                     })
-            elif ext.get("is_unavailable"):
-                unavail_apis = ", ".join(ext.get("unavailable_by", []))
-                self.contributions.append({
-                    "label": "External Verification Unavailable",
-                    "points": 0,
-                    "icon": "shield-alert",
-                    "detail": (
-                        f"External threat intelligence check unavailable for '{ext['url']}' "
-                        f"({unavail_apis}). Scored using internal rules."
-                    ),
-                })
+                    flag_msg = f"Confirmed threat: {ext['url']} (flagged by {flagged_apis})"
+                    if flag_msg not in self.red_flags:
+                        self.red_flags.append(flag_msg)
+                elif ext.get("is_safe"):
+                    url_info = analyze_url(ext["url"])
+                    if not url_info.get("tld_suspicious") and not url_info.get("is_shortener") and not url_info.get("is_ip"):
+                        checked_apis = ", ".join(ext.get("safe_by", []))
+                        self.contributions.append({
+                            "label": "External APIs: Clear",
+                            "points": -10,
+                            "icon": "shield-check",
+                            "detail": (
+                                f"URL '{ext['url']}' was verified clean by: {checked_apis}."
+                            ),
+                        })
+                elif ext.get("is_unavailable"):
+                    unavail_apis = ", ".join(ext.get("unavailable_by", []))
+                    self.contributions.append({
+                        "label": "External Verification Unavailable",
+                        "points": 0,
+                        "icon": "shield-alert",
+                        "detail": (
+                            f"External threat intelligence check unavailable for '{ext['url']}' "
+                            f"({unavail_apis}). Scored using internal rules."
+                        ),
+                    })
 
-        # Final consistency enforcement
-        self.verdict = _normalize_verdict(self.verdict, self.risk_score)
+            # Final consistency enforcement
+            self.verdict = _normalize_verdict(self.verdict, self.risk_score)
 
-        self.has_result = True
-        self.is_analyzing = False
+            self.has_result = True
 
-        user_id = ""
-        try:
-            from fraudradar_ai_scam_detection_v2.states.auth_state import AuthState
-            auth = await self.get_state(AuthState)
-            user_id = auth.user_id or ""
-        except Exception:
-            logging.debug("auth lookup not available in current context")
+            user_id = ""
+            try:
+                from fraudradar_ai_scam_detection_v2.states.auth_state import AuthState
+                auth = await self.get_state(AuthState)
+                user_id = auth.user_id or ""
+            except Exception:
+                logging.debug("auth lookup not available in current context")
 
-        record: ScanRecord = {
-            "id": datetime.datetime.now().strftime("%Y%m%d%H%M%S%f"),
-            "user_id": user_id,
-            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "input_text": analysis_text[:500],
-            "input_type": analysis_type,
-            "risk_score": self.risk_score,
-            "confidence": self.confidence,
-            "verdict": self.verdict,
-            "summary": self.summary,
-            "explanation": self.explanation,
-            "categories": self.categories,
-            "red_flags": self.red_flags,
-            "actions": self.actions,
-            "checklist": self.checklist,
-            "keywords": self.keywords,
-            "entities": self.entities,
-            "threat_breakdown": self.threat_breakdown,
-            "contributions": self.contributions,
-        }
-        self.history.insert(0, record)
+            record: ScanRecord = {
+                "id": datetime.datetime.now().strftime("%Y%m%d%H%M%S%f"),
+                "user_id": user_id,
+                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "input_text": analysis_text[:500],
+                "input_type": analysis_type,
+                "risk_score": self.risk_score,
+                "confidence": self.confidence,
+                "verdict": self.verdict,
+                "summary": self.summary,
+                "explanation": self.explanation,
+                "categories": self.categories,
+                "red_flags": self.red_flags,
+                "actions": self.actions,
+                "checklist": self.checklist,
+                "keywords": self.keywords,
+                "entities": self.entities,
+                "threat_breakdown": self.threat_breakdown,
+                "contributions": self.contributions,
+            }
+            self.history.insert(0, record)
 
-        # Background async persistence to Supabase
-        try:
-            asyncio.create_task(asyncio.to_thread(self._persist_to_supabase, record))
-        except Exception as e:
-            logging.debug(f"Async persistence dispatch skipped: {e}")
+            # Background async persistence to Supabase
+            try:
+                asyncio.create_task(asyncio.to_thread(self._persist_to_supabase, record))
+            except Exception as e:
+                logging.debug(f"Async persistence dispatch skipped: {e}")
+        finally:
+            self.is_analyzing = False
 
     def _build_contributions(
         self,
@@ -1284,7 +1310,7 @@ class ScanState(rx.State):
             try:
                 sb.table("scan_history").insert(minimal_payload).execute()
             except Exception as e2:
-                logging.exception(f"scan_history insert failed: {e2}")
+                logging.warning(f"scan_history insert notice (offline or db unreachable): {e2}")
 
     def _analyze_sync(self, text: str, input_type: str = "text") -> dict:
         api_key = os.getenv("GROQ_API_KEY")

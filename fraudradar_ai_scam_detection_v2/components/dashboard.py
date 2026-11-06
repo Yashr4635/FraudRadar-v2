@@ -84,21 +84,21 @@ def overview_row() -> rx.Component:
     )
 
 
-def quick_action_card(icon: str, title: str, desc: str, href: str, accent: str) -> rx.Component:
-    return rx.el.a(
+def quick_action_card(icon: str, title: str, desc: str, input_type: str, accent: str) -> rx.Component:
+    return rx.el.button(
         rx.el.div(
             rx.icon(icon, class_name=f"h-5 w-5 {accent}"),
             class_name="h-11 w-11 rounded-xl bg-gradient-to-br from-orange-50 to-white border border-orange-100 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:shadow-sm transition-all duration-300",
         ),
-        rx.el.p(title, class_name="text-sm font-bold text-gray-900"),
-        rx.el.p(desc, class_name="text-xs text-gray-500 mt-1 leading-relaxed min-h-[2.25rem]"),
+        rx.el.p(title, class_name="text-sm font-bold text-gray-900 text-left"),
+        rx.el.p(desc, class_name="text-xs text-gray-500 mt-1 leading-relaxed min-h-[2.25rem] text-left"),
         rx.el.div(
-            rx.el.span("Open", class_name="text-xs font-semibold text-[#E8471A]"),
+            rx.el.span("Open tool", class_name="text-xs font-semibold text-[#E8471A]"),
             rx.icon("arrow-right", class_name="h-3 w-3 stroke-[#E8471A] group-hover:translate-x-1 transition-transform"),
             class_name="flex items-center gap-1 mt-3",
         ),
-        href=href,
-        class_name="group relative bg-white border border-gray-200 rounded-2xl p-4 hover:border-orange-300 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] transition-all duration-150 cursor-pointer",
+        on_click=[ScanState.set_input_type(input_type), rx.redirect("/analyze")],
+        class_name="group relative w-full bg-white border border-gray-200 rounded-2xl p-4 hover:border-orange-300 hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] transition-all duration-150 cursor-pointer text-left",
     )
 
 
@@ -113,11 +113,11 @@ def quick_scan_panel() -> rx.Component:
             class_name="flex items-center justify-between mb-4",
         ),
         rx.el.div(
-            quick_action_card("message-square-warning", "Analyze Message", "Paste SMS, WhatsApp, or email to scan.", "/analyze", "stroke-[#E8471A]"),
-            quick_action_card("globe", "Scan Website", "Verify a URL for phishing or fraud.", "/analyze", "stroke-blue-500"),
-            quick_action_card("phone", "Verify Phone", "Check a number for known scam reports.", "/analyze", "stroke-emerald-500"),
-            quick_action_card("image", "Upload Screenshot", "Send a screenshot for AI analysis.", "/analyze", "stroke-purple-500"),
-            quick_action_card("qr-code", "Scan QR Code", "Decode and verify any QR before paying.", "/analyze", "stroke-pink-500"),
+            quick_action_card("message-square-warning", "Analyze Message", "Paste SMS, WhatsApp, or email to scan.", "text", "stroke-[#E8471A]"),
+            quick_action_card("globe", "Scan Website", "Verify a URL for phishing or fraud.", "url", "stroke-blue-500"),
+            quick_action_card("phone", "Verify Phone", "Check a number for known scam reports.", "phone", "stroke-emerald-500"),
+            quick_action_card("image", "Upload Screenshot", "Send a screenshot for AI analysis.", "image", "stroke-purple-500"),
+            quick_action_card("qr-code", "Scan QR Code", "Decode and verify any QR before paying.", "qr", "stroke-pink-500"),
             class_name="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3",
         ),
     )

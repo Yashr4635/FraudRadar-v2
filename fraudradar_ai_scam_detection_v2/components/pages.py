@@ -324,12 +324,23 @@ def _input_type_tab(value: str, label: str, icon: str) -> rx.Component:
     return rx.el.button(
         rx.icon(icon, class_name="h-3.5 w-3.5"),
         rx.el.span(label, class_name="text-xs font-semibold"),
+        type="button",
         on_click=ScanState.set_input_type(value),
         class_name=rx.cond(
             ScanState.input_type == value,
             "cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E8471A] text-white shadow-sm",
             "cursor-pointer active:scale-95 transition-all duration-75 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-[#E8471A]",
         ),
+    )
+
+
+def _sample_chip(label: str, icon: str, sample_text: str, sample_type: str = "text") -> rx.Component:
+    return rx.el.button(
+        rx.icon(icon, class_name="h-3 w-3 text-[#E8471A]"),
+        rx.el.span(label, class_name="text-[11px] font-medium text-gray-700"),
+        type="button",
+        on_click=ScanState.set_sample(sample_text, sample_type),
+        class_name="cursor-pointer active:scale-95 transition-all inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-orange-200/80 bg-orange-50/50 hover:bg-orange-100 hover:border-orange-300 text-gray-800 shadow-2xs",
     )
 
 
@@ -613,99 +624,130 @@ def analyze_content() -> rx.Component:
                 _input_type_tab("phone", "Phone", "phone"),
                 _input_type_tab("image", "Screenshot", "image"),
                 _input_type_tab("qr", "QR Code", "qr-code"),
-                class_name="flex flex-wrap gap-2 mb-4",
+                class_name="flex flex-wrap gap-2 mb-3",
             ),
-            rx.match(
-                ScanState.input_type,
-                ("image", _screenshot_upload_zone()),
-                ("qr", _qr_upload_zone()),
-                (
-                    "phone",
-                    rx.el.div(
-                        rx.icon(
-                            "phone",
-                            class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400",
+            # Quick Demonstration Samples
+            rx.el.div(
+                rx.el.div(
+                    rx.icon("sparkles", class_name="h-3.5 w-3.5 text-amber-500"),
+                    rx.el.span("Quick Test Samples:", class_name="text-xs font-semibold text-gray-600"),
+                    class_name="flex items-center gap-1.5",
+                ),
+                rx.el.div(
+                    _sample_chip("KYC Scam", "shield-alert", "Dear SBI user, your YONO account will be blocked today due to pending KYC. Click http://sbi-kyc-verify.com to update now.", "text"),
+                    _sample_chip("Power Cut Threat", "zap-off", "URGENT: Electricity will be disconnected tonight at 9:30 PM due to unpaid bill. Call officer at 9876543210 immediately.", "text"),
+                    _sample_chip("Job / Task Fraud", "badge-dollar-sign", "Part-time job offer: Like YouTube videos and earn Rs 3000 daily from home. Instant payment via UPI. Message now on WhatsApp.", "message"),
+                    _sample_chip("Safe Bank OTP", "shield-check", "384920 is your secret OTP for transaction of Rs 1,500.00 at AMAZON on HDFC Bank Card ending 4092. Valid for 10 mins. Do NOT share OTP with anyone.", "text"),
+                    _sample_chip("Phishing Link", "link-2", "http://free-gift-claim.top/spin-win", "url"),
+                    class_name="flex flex-wrap gap-1.5",
+                ),
+                class_name="flex flex-col sm:flex-row sm:items-center gap-2 mb-4 p-2.5 rounded-lg bg-orange-50/40 border border-orange-100",
+            ),
+            rx.el.form(
+                rx.match(
+                    ScanState.input_type,
+                    ("image", _screenshot_upload_zone()),
+                    ("qr", _qr_upload_zone()),
+                    (
+                        "phone",
+                        rx.el.div(
+                            rx.icon(
+                                "phone",
+                                class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400",
+                            ),
+                            rx.debounce_input(
+                                rx.el.input(
+                                    id="analyze-input-phone",
+                                    name="input_phone",
+                                    placeholder="+91 98765 43210",
+                                    value=ScanState.input_text,
+                                    on_change=ScanState.set_input_text,
+                                    class_name="w-full pl-10 pr-3 py-3 rounded-lg border border-gray-300 bg-white text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
+                                ),
+                                debounce_timeout=150,
+                            ),
+                            class_name="relative",
                         ),
-                        rx.el.input(
-                            id="analyze-input-phone",
-                            placeholder="+91 98765 43210",
+                    ),
+                    (
+                        "url",
+                        rx.el.div(
+                            rx.icon(
+                                "link",
+                                class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400",
+                            ),
+                            rx.debounce_input(
+                                rx.el.input(
+                                    id="analyze-input-url",
+                                    name="input_url",
+                                    placeholder="https://example.com or bit.ly/abc",
+                                    value=ScanState.input_text,
+                                    on_change=ScanState.set_input_text,
+                                    class_name="w-full pl-10 pr-3 py-3 rounded-lg border border-gray-300 bg-white text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
+                                ),
+                                debounce_timeout=150,
+                            ),
+                            class_name="relative",
+                        ),
+                    ),
+                    rx.debounce_input(
+                        rx.el.textarea(
+                            id="analyze-input-text",
+                            name="input_text",
+                            placeholder="Paste suspicious SMS, WhatsApp message, email, or text here...",
                             value=ScanState.input_text,
                             on_change=ScanState.set_input_text,
-                            class_name="w-full pl-10 pr-3 py-3 rounded-lg border border-gray-300 bg-white text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
+                            class_name="w-full min-h-[160px] p-3 rounded-lg border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A] focus:border-transparent",
                         ),
-                        class_name="relative",
+                        debounce_timeout=150,
                     ),
                 ),
-                (
-                    "url",
+                rx.cond(
+                    ScanState.error != "",
                     rx.el.div(
-                        rx.icon(
-                            "link",
-                            class_name="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400",
-                        ),
-                        rx.el.input(
-                            id="analyze-input-url",
-                            placeholder="https://example.com or bit.ly/abc",
-                            value=ScanState.input_text,
-                            on_change=ScanState.set_input_text,
-                            class_name="w-full pl-10 pr-3 py-3 rounded-lg border border-gray-300 bg-white text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-[#E8471A]",
-                        ),
-                        class_name="relative",
+                        rx.icon("circle-alert", class_name="h-4 w-4 text-red-600"),
+                        rx.el.p(ScanState.error, class_name="text-sm text-red-700"),
+                        class_name="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 mt-3",
                     ),
+                    rx.fragment(),
                 ),
-                rx.el.textarea(
-                    id="analyze-input-text",
-                    placeholder="Paste suspicious SMS, WhatsApp message, email, or text here...",
-                    value=ScanState.input_text,
-                    on_change=ScanState.set_input_text,
-                    class_name="w-full min-h-[160px] p-3 rounded-lg border border-gray-300 bg-white text-sm focus:outline-hidden focus:ring-2 focus:ring-[#E8471A] focus:border-transparent",
-                ),
-            ),
-            rx.cond(
-                ScanState.error != "",
-                rx.el.div(
-                    rx.icon("circle-alert", class_name="h-4 w-4 text-red-600"),
-                    rx.el.p(ScanState.error, class_name="text-sm text-red-700"),
-                    class_name="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 mt-3",
-                ),
-                rx.fragment(),
-            ),
-            rx.cond(
-                (ScanState.input_type != "image")
-                & (ScanState.input_type != "qr"),
-                rx.el.div(
-                    rx.el.button(
-                        rx.cond(
-                            ScanState.is_analyzing,
-                            rx.fragment(
-                                rx.icon(
-                                    "loader-circle",
-                                    class_name="h-4 w-4 animate-spin",
+                rx.cond(
+                    (ScanState.input_type != "image")
+                    & (ScanState.input_type != "qr"),
+                    rx.el.div(
+                        rx.el.button(
+                            rx.cond(
+                                ScanState.is_analyzing,
+                                rx.fragment(
+                                    rx.icon(
+                                        "loader-circle",
+                                        class_name="h-4 w-4 animate-spin",
+                                    ),
+                                    rx.el.span("Analyzing..."),
                                 ),
-                                rx.el.span("Analyzing..."),
-                            ),
-                            rx.fragment(
-                                rx.icon(
-                                    "scan-search",
-                                    class_name="h-4 w-4",
+                                rx.fragment(
+                                    rx.icon(
+                                        "scan-search",
+                                        class_name="h-4 w-4",
+                                    ),
+                                    rx.el.span("Analyze Now"),
                                 ),
-                                rx.el.span("Analyze Now"),
                             ),
+                            type="submit",
+                            disabled=ScanState.is_analyzing,
+                            class_name="cursor-pointer active:scale-95 transition-all duration-75 flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#E8471A] text-white text-sm font-semibold hover:bg-[#c43a13] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow",
                         ),
-                        on_click=ScanState.start_analysis(
-                            ScanState.input_text, ScanState.input_type
+                        rx.el.button(
+                            "Clear",
+                            type="button",
+                            on_click=ScanState.clear_result,
+                            class_name="cursor-pointer active:scale-95 transition-all duration-75 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 shadow-xs",
                         ),
-                        disabled=ScanState.is_analyzing,
-                        class_name="cursor-pointer active:scale-95 transition-all duration-75 flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#E8471A] text-white text-sm font-semibold hover:bg-[#c43a13] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow",
+                        class_name="flex items-center gap-3 mt-4",
                     ),
-                    rx.el.button(
-                        "Clear",
-                        on_click=ScanState.clear_result,
-                        class_name="cursor-pointer active:scale-95 transition-all duration-75 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 hover:border-gray-400 shadow-xs",
-                    ),
-                    class_name="flex items-center gap-3 mt-4",
+                    rx.fragment(),
                 ),
-                rx.fragment(),
+                on_submit=ScanState.handle_submit,
             ),
         ),
         rx.cond(
