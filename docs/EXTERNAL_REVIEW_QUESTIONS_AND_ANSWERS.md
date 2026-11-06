@@ -35,10 +35,13 @@
 **Answer**: The 8-digit OTP is generated using Python’s cryptographically secure random number generator (`secrets.randbelow(100_000_000)`). The plaintext code is never stored in the database. Instead, an HMAC-SHA256 hash is computed using a 16-byte random salt and stored with a 10-minute TTL. Verification uses `hmac.compare_digest()` to eliminate timing attacks, and codes are single-use (`consumed = 1`).
 
 ### Q10. What protects the authentication system from brute-force attacks?
-**Answer**: Three layers of defense:
-1. 8-digit codes have 100,000,000 combinations (compared to only 1,000,000 for 6-digit codes).
-2. A hard limit of 5 failed attempts per OTP record before the code is permanently invalidated.
-3. IP and email rate limiting enforcing a maximum of 5 requests per 15-minute window (`check_rate_limit()`).
+**Answer**: Brute-force guessing is mitigated by a multi-layered cryptographic and operational defense rather than theoretical impossibility:
+1. **Large Search Space**: 8 decimal digits provide $10^8 = 100,000,000$ possible combinations (a 100× expansion over 6-digit codes).
+2. **Strict Attempt Threshold**: A hard limit of 5 failed attempts per OTP record is enforced. On the 5th failed attempt, the record is permanently locked and invalidated.
+3. **Statistical Bound**: For any active OTP session, the probability of an attacker randomly guessing the correct code within the 5 allowed attempts is strictly $\frac{5}{10^8} = 5 \times 10^{-8} = 0.000005\%$.
+4. **Time-To-Live (TTL)**: Codes expire automatically after 10 minutes (600 seconds) regardless of attempt count.
+5. **Single-Use Invalidation**: Upon successful verification, the record is immediately flagged as `consumed = 1` in the database, preventing replay.
+6. **Throttling & Cooldown**: A 60-second cooldown is enforced between resend requests, with IP/email rate limiting capping requests at 5 per 15-minute window (`check_rate_limit()`).
 
 ### Q11. Which database does FraudRadar use in production?
 **Answer**: FraudRadar-v2 implements a dual-tier persistence layer (`auth_db.py`). Locally, it runs on SQLite in Write-Ahead Logging (WAL) mode. In cloud production, it connects to PostgreSQL (via Supabase or `DATABASE_URL`) with automatic schema initialization and SQLite-to-PostgreSQL user table migration.
@@ -142,7 +145,7 @@
 **Answer**: Streamlit re-executes the entire Python script from top to bottom on every user interaction, making it unsuitable for complex stateful workflows, authentication guards, and multi-page routing. Reflex operates as a true production web framework with persistent event-driven state machines, native WebSocket channels, and compiled React/Next.js frontend assets.
 
 ### Q40. Why did you choose 8-digit OTPs over 6-digit OTPs?
-**Answer**: 6-digit OTPs offer only 1,000,000 combinations, making them vulnerable to distributed brute-force attacks across large botnets within a 10-minute window. 8-digit OTPs expand the keyspace to 100,000,000 combinations (a 100x increase in entropy), rendering online guessing mathematically infeasible within the 5-attempt limit.
+**Answer**: 6-digit OTPs offer only 1,000,000 combinations. When combined with distributed requests, the probability of guessing within 5 attempts is $5 \times 10^{-6}$ (1 in 200,000). By expanding length to 8 digits, the keyspace expands by a factor of 100 to 100,000,000 combinations ($10^8$), reducing the probability of an attacker guessing the code within the 5-attempt limit to $5 \times 10^{-8}$ (1 in 20,000,000). Combined with 10-minute expiry and single-use invalidation, this bounds online brute-force risk to negligible operational levels.
 
 ### Q41. How does the application manage secrets in production?
 **Answer**: Secrets (`GROQ_API_KEY`, `JWT_SECRET`, `SMTP_PASSWORD`, `SUPABASE_KEY`) are stored exclusively in Reflex Cloud encrypted environment secrets. They are never committed to git, written to logs, or exposed in client-side HTML bundles.

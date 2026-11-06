@@ -182,7 +182,10 @@ The following table details how each major scam vector is detected across the co
 
 ## 6. REALISTIC PROCESSING CASE STUDIES (5 LIVE EXAMPLES)
 
-The following 5 examples demonstrate the actual output produced by FraudRadar-v2 when evaluated by the engine:
+The following 5 examples demonstrate the actual output produced by FraudRadar-v2 when evaluated by the engine. 
+
+> [!NOTE]
+> **Demonstration Preset Cache**: These 5 canonical examples populate the in-memory pre-warmed demonstration cache (`CURATED_SAMPLES_EVALUATION`), corresponding directly to the 5 "Quick Test Sample" buttons in the UI. This provides deterministic sub-millisecond (<2ms) evaluation during live academic demonstrations. Any other message or custom input completely bypasses this cache and executes live inference through Groq LLM and heuristic rules.
 
 ### Case 1: Legitimate Bank Notification
 **Input**:

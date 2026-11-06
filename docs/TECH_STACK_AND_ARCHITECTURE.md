@@ -235,7 +235,7 @@ CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON delivery_logs(timestamp);
 ### 7.1 Security Guarantees
 - **No Plaintext Passwords**: Passwords are hashed using PBKDF2-HMAC-SHA256 with 100,000 iterations and a cryptographically unique salt.
 - **No Plaintext OTPs at Rest**: OTPs are generated in memory, hashed using HMAC-SHA256 with a unique salt, and stored in the database. Compromising the database does not reveal active OTP codes.
-- **Brute-Force Immunity**: Maximum 5 attempts permitted per OTP code. The OTP record is consumed immediately on verification (`consumed = 1`).
+- **Brute-Force Mitigation**: Strict threshold of 5 attempts permitted per OTP record (bounding random guess probability to $5 \times 10^{-8}$ across $10^8$ keyspace). The OTP record is marked `consumed = 1` immediately upon successful verification.
 - **Rate Limiting**: `check_rate_limit()` enforces a strict quota: maximum 5 OTP requests per email address within a 15-minute sliding window (`900 seconds`).
 - **Session Tokens**: Authenticated sessions issue JSON Web Tokens (JWT) signed with `HS256` using a dynamic 256-bit secret key (`JWT_SECRET`).
 

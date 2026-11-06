@@ -774,7 +774,7 @@ def analyze_content() -> rx.Component:
                                     class_name="h-3.5 w-3.5 text-gray-500",
                                 ),
                                 rx.el.span(
-                                    "Confidence: ",
+                                    "Model & Rule Agreement: ",
                                     class_name="text-xs text-gray-500",
                                 ),
                                 rx.el.span(
@@ -782,6 +782,10 @@ def analyze_content() -> rx.Component:
                                     class_name="text-xs font-bold text-gray-900",
                                 ),
                                 class_name="flex items-center gap-1.5 mt-2",
+                            ),
+                            rx.el.p(
+                                "Heuristic agreement score between deterministic rules and model reasoning (not a calibrated probability).",
+                                class_name="text-[10px] text-gray-400 mt-0.5",
                             ),
                             class_name="flex-1",
                         ),
@@ -1194,7 +1198,7 @@ def history_content() -> rx.Component:
                                     class_name="text-xs text-gray-300",
                                 ),
                                 rx.el.p(
-                                    "Conf " + h["confidence"].to_string() + "%",
+                                    "Agreement " + h["confidence"].to_string() + "%",
                                     class_name="text-xs text-gray-500 font-medium",
                                 ),
                                 class_name="flex items-center gap-2",

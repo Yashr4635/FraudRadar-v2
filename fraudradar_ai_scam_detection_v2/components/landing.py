@@ -278,6 +278,24 @@ def step_card(num: str, title: str, desc: str, icon: str) -> rx.Component:
     )
 
 
+def case_study_card(
+    category: str, subcategory: str, summary: str, badge_icon: str
+) -> rx.Component:
+    return rx.el.div(
+        rx.el.div(
+            rx.icon(badge_icon, class_name="h-4 w-4 text-orange-600"),
+            rx.el.span(category, class_name="text-xs font-bold text-orange-600 uppercase tracking-wider"),
+            class_name="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 w-fit mb-3",
+        ),
+        rx.el.h3(subcategory, class_name="text-base font-bold text-gray-900 mb-2"),
+        rx.el.p(
+            summary,
+            class_name="text-sm text-gray-600 leading-relaxed font-normal",
+        ),
+        class_name="bg-white border border-gray-200 rounded-2xl p-6 hover-lift hover:border-orange-300 hover:shadow-lg transition-all duration-300 flex flex-col justify-between",
+    )
+
+
 def testimonial_card(
     name: str, role: str, quote: str, initial: str
 ) -> rx.Component:
@@ -807,20 +825,20 @@ def landing_page() -> rx.Component:
             rx.el.div(
                 rx.el.div(
                     rx.el.h2(
-                        "Trusted by safety-conscious Indians",
+                        "Engineered for Rapid Scam Defense",
                         class_name="text-2xl sm:text-3xl font-bold text-gray-900 text-center",
                     ),
                     rx.el.p(
-                        "Real impact, real protection.",
+                        "Multi-layered detection architecture for India's digital threat landscape.",
                         class_name="text-sm text-gray-600 text-center mt-2",
                     ),
                     class_name="mb-10",
                 ),
                 rx.el.div(
-                    stat_card_landing("50K+", "Scans Performed", "scan-search"),
-                    stat_card_landing("12K+", "Scams Blocked", "shield-alert"),
-                    stat_card_landing("99.2%", "Accuracy Rate", "target"),
-                    stat_card_landing("0.8s", "Avg Response", "zap"),
+                    stat_card_landing("Multi-Modal", "Text, URL, Phone & QR", "scan-search"),
+                    stat_card_landing("7+", "Scam Vectors Analyzed", "shield-alert"),
+                    stat_card_landing("Hybrid AI", "LLM + Expert Rules", "brain-circuit"),
+                    stat_card_landing("< 1.5s", "Evaluation Latency", "zap"),
                     class_name="grid grid-cols-2 lg:grid-cols-4 gap-4",
                 ),
                 class_name="max-w-7xl mx-auto px-6 py-16",
@@ -840,7 +858,7 @@ def landing_page() -> rx.Component:
                         class_name="text-3xl sm:text-4xl font-bold text-gray-900 mt-3 max-w-2xl mx-auto text-center",
                     ),
                     rx.el.p(
-                        "Built specifically for the Indian threat landscape with AI trained on local fraud patterns.",
+                        "Built specifically for the Indian threat landscape with specialized heuristics and prompt-tuned LLM intelligence.",
                         class_name="text-base text-gray-600 mt-4 max-w-2xl mx-auto text-center",
                     ),
                     class_name="mb-12 text-center mx-auto flex flex-col items-center",
@@ -879,12 +897,12 @@ def landing_page() -> rx.Component:
                     feature_card(
                         "shield-check",
                         "Privacy First",
-                        "End-to-end encrypted, DPDP-compliant, your data stays yours.",
+                        "Encrypted in transit (TLS 1.3), DPDP-aligned privacy, your data stays yours.",
                     ),
                     feature_card(
                         "bell",
-                        "Real-Time Alerts",
-                        "Get notified about trending scams and emerging fraud patterns.",
+                        "Instant Scam Verdicts",
+                        "Get immediate risk assessment, category breakdown, and red flags upon analysis.",
                     ),
                     class_name="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4",
                 ),
@@ -915,7 +933,7 @@ def landing_page() -> rx.Component:
                     step_card(
                         "01",
                         "Sign Up Securely",
-                        "Create your free FraudRadar account with email or Google.",
+                        "Create your free FraudRadar account with secure email OTP.",
                         "user-plus",
                     ),
                     step_card(
@@ -966,43 +984,47 @@ def landing_page() -> rx.Component:
             ),
             class_name="bg-gradient-to-b from-white to-orange-50/30",
         ),
-        # TESTIMONIALS
+        # THREAT SCENARIOS & CASE STUDIES
         rx.el.section(
             rx.el.div(
                 rx.el.div(
                     rx.el.span(
-                        "TESTIMONIALS",
+                        "THREAT VECTORS",
                         class_name="inline-block text-xs font-semibold text-orange-500 uppercase tracking-widest",
                     ),
                     rx.el.h2(
-                        "Loved by users across India",
+                        "Real-World Scenarios Handled by FraudRadar",
                         class_name="text-3xl sm:text-4xl font-bold text-gray-900 mt-3",
+                    ),
+                    rx.el.p(
+                        "Representative threat patterns frequently encountered across Indian SMS and digital channels.",
+                        class_name="text-base text-gray-600 mt-4 max-w-2xl mx-auto",
                     ),
                     class_name="text-center mb-12",
                 ),
                 rx.el.div(
-                    testimonial_card(
-                        "Priya Sharma",
-                        "Software Engineer, Mumbai",
-                        "FraudRadar caught a fake KYC SMS that almost tricked me. The AI explanation was clear and actionable. A must-have for every Indian.",
-                        "P",
+                    case_study_card(
+                        "Utility Extortion",
+                        "Fake Electricity Discom SMS",
+                        "Threatens nighttime power cutoff with unverified 10-digit mobile number. FraudRadar flags unverified numbers, fake urgency, and missing Discom headers.",
+                        "zap",
                     ),
-                    testimonial_card(
-                        "Rajesh Kumar",
-                        "Small Business Owner, Delhi",
-                        "I get suspicious UPI requests daily. FraudRadar tells me which ones are real in seconds. It saved my business from a payment scam.",
-                        "R",
+                    case_study_card(
+                        "Credential Theft",
+                        "Deceptive Bank KYC Phishing",
+                        "Coerces victims into visiting typosquatted web links to avoid account freeze. FraudRadar detects third-party domains, unencrypted HTTP, and credential harvest requests.",
+                        "shield-alert",
                     ),
-                    testimonial_card(
-                        "Ananya Iyer",
-                        "Student, Bangalore",
-                        "The assistant helped me understand a job offer scam I almost fell for. The interface is so clean and the responses are super helpful.",
-                        "A",
+                    case_study_card(
+                        "Prepaid Job Fraud",
+                        "Social Media Task Scam",
+                        "Promises unrealistic daily income for liking videos, redirecting victims to untraceable Telegram/WhatsApp chats. FraudRadar identifies high-risk task-recruitment mechanics.",
+                        "briefcase",
                     ),
                     class_name="grid grid-cols-1 md:grid-cols-3 gap-4",
                 ),
                 class_name="max-w-7xl mx-auto px-6 py-20",
-                id="testimonials",
+                id="threat-vectors",
             ),
             class_name="bg-white",
         ),
@@ -1032,7 +1054,7 @@ def landing_page() -> rx.Component:
                             class_name="text-3xl sm:text-4xl font-bold text-white mt-6 text-center max-w-2xl mx-auto",
                         ),
                         rx.el.p(
-                            "Join thousands of safety-conscious Indians using FraudRadar to stay ahead of scams. Free to start, no credit card required.",
+                            "Empowering citizens with real-time scam defense and cybercrime reporting guidance. Free to start, no credit card required.",
                             class_name="text-base text-orange-50 mt-4 text-center max-w-xl mx-auto",
                         ),
                         rx.el.div(

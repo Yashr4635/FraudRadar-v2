@@ -139,45 +139,28 @@ def login_marketing_panel() -> rx.Component:
                 class_name="grid grid-cols-2 gap-2.5 mt-6",
             ),
             rx.el.div(
-                _stat_pill("98%", "Detection Accuracy", "target"),
-                _stat_pill("25K+", "Scans Performed", "scan-search"),
+                _stat_pill("Hybrid AI", "Scam Defense Engine", "target"),
+                _stat_pill("Multi-Modal", "Text, URL & Phone", "scan-search"),
                 _stat_pill("24/7", "Protection", "shield"),
                 _stat_pill("AI", "Powered Analysis", "brain-circuit"),
                 class_name="grid grid-cols-2 gap-2 mt-4",
             ),
             rx.el.div(
                 _trust_chip("lock", "Secure Authentication"),
-                _trust_chip("key-round", "End-to-End Encryption"),
+                _trust_chip("key-round", "Encrypted in Transit (TLS)"),
                 _trust_chip("shield-check", "Privacy First"),
                 _trust_chip("map-pin", "India-Focused"),
                 class_name="flex flex-wrap gap-1.5 mt-5",
             ),
             rx.el.div(
                 rx.el.div(
-                    rx.icon("quote", class_name="h-4 w-4 text-white/60"),
-                    rx.el.div(
-                        rx.foreach(
-                            ["star", "star", "star", "star", "star"],
-                            lambda s: rx.icon(s, class_name="h-3 w-3 text-yellow-300 fill-yellow-300"),
-                        ),
-                        class_name="flex items-center gap-0.5 ml-auto",
-                    ),
-                    class_name="flex items-center gap-2",
+                    rx.icon("shield-alert", class_name="h-4 w-4 text-white/80"),
+                    rx.el.span("Core Defense", class_name="text-xs font-bold text-white uppercase tracking-wider"),
+                    class_name="flex items-center gap-1.5",
                 ),
                 rx.el.p(
-                    '"FraudRadar caught a fake KYC SMS that almost tricked me. The AI explanation was crystal clear."',
-                    class_name="text-sm text-white/95 italic mt-2 leading-relaxed",
-                ),
-                rx.el.div(
-                    rx.el.div(
-                        "P",
-                        class_name="h-8 w-8 rounded-full bg-white text-orange-600 flex items-center justify-center text-xs font-bold shrink-0",
-                    ),
-                    rx.el.div(
-                        rx.el.p("Priya Sharma", class_name="text-xs font-bold text-white"),
-                        rx.el.p("Software Engineer · Mumbai", class_name="text-[10px] text-white/70"),
-                    ),
-                    class_name="flex items-center gap-2 mt-3",
+                    "Purpose-built AI defense engineered to identify deceptive phishing, utility extortion, and financial fraud before harm occurs.",
+                    class_name="text-xs text-white/95 mt-2 leading-relaxed font-medium",
                 ),
                 class_name="mt-5 p-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20",
             ),
@@ -218,8 +201,7 @@ def marketing_panel() -> rx.Component:
                 class_name="flex flex-col gap-4 mt-10",
             ),
             rx.el.div(
-                rx.el.p('"Saved me from a fake KYC scam last week."', class_name="text-white/90 text-sm italic"),
-                rx.el.p("— Priya, Mumbai", class_name="text-white/70 text-xs mt-2"),
+                rx.el.p("Designed for rapid threat evaluation and 1930 Cybercrime Helpline reporting.", class_name="text-white/90 text-xs font-medium"),
                 class_name="mt-12 p-4 rounded-xl bg-white/10 border border-white/20",
             ),
             class_name="max-w-sm",
