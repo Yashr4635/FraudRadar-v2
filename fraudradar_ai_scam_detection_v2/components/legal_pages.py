@@ -392,3 +392,4 @@ def dedicated_privacy_page() -> rx.Component:
         privacy_content(),
         active_tab="privacy",
     )
+
