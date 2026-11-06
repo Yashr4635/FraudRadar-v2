@@ -493,12 +493,16 @@ class AuthState(rx.State):
         local_user = auth_db.get_user_by_email(email)
         if local_user and local_user.get("password_hash") and auth_db.verify_password(self.login_password, local_user["password_hash"]):
             if not local_user.get("is_verified"):
+                ok, msg, masked = otp_service.send_auth_otp(
+                    email=email,
+                    purpose="signup",
+                    recipient_name=local_user.get("full_name", ""),
+                )
                 self.otp_email = email
                 self.otp_type = "signup"
                 self.show_otp_view = True
                 self.auth_error = ""
-                masked = mask_email(email)
-                self.auth_success = f"Please enter the 8-digit verification code sent to {masked} to activate your account."
+                self.auth_success = f"Please enter the 8-digit verification code sent to {masked} to activate your account." if ok else msg
                 self.loading = False
                 return AuthState.start_resend_countdown
 

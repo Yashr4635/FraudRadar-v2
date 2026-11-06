@@ -64,7 +64,8 @@ class EmailService:
     @classmethod
     def is_configured(cls) -> bool:
         """Check if any valid email provider credentials are configured."""
-        if os.getenv("SMTP_HOST") and os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD"):
+        smtp_pwd = os.getenv("SMTP_PASSWORD", "").strip().replace(" ", "")
+        if os.getenv("SMTP_HOST") and os.getenv("SMTP_USER") and smtp_pwd:
             return True
         if os.getenv("RESEND_API_KEY"):
             return True
@@ -332,7 +333,7 @@ Helpline: 1930 | https://cybercrime.gov.in
         # ── 1. Check if SMTP is configured ──────────────────────────────────
         smtp_host = os.getenv("SMTP_HOST", "").strip()
         smtp_user = os.getenv("SMTP_USER", "").strip()
-        smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+        smtp_password = os.getenv("SMTP_PASSWORD", "").strip().replace(" ", "")
 
         if smtp_host and smtp_user and smtp_password:
             return cls._send_via_smtp(
@@ -436,7 +437,7 @@ Helpline: 1930 | https://cybercrime.gov.in
         smtp_host = os.getenv("SMTP_HOST", "").strip()
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
         smtp_user = os.getenv("SMTP_USER", "").strip()
-        smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+        smtp_password = os.getenv("SMTP_PASSWORD", "").strip().replace(" ", "")
         use_ssl = (
             os.getenv("SMTP_USE_SSL", "false").lower() in ("true", "1")
             or smtp_port == 465
@@ -781,7 +782,7 @@ Helpline: 1930 | https://cybercrime.gov.in
         """Test authentication and connectivity with configured email provider without sending an email."""
         smtp_host = os.getenv("SMTP_HOST", "").strip()
         smtp_user = os.getenv("SMTP_USER", "").strip()
-        smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
+        smtp_password = os.getenv("SMTP_PASSWORD", "").strip().replace(" ", "")
         if smtp_host and smtp_user and smtp_password:
             smtp_port = int(os.getenv("SMTP_PORT", "587"))
             use_ssl = (
