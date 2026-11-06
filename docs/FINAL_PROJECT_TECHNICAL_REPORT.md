@@ -134,3 +134,4 @@ The detailed analysis for all technical review aspects is organized into the fol
 5. [docs/PROJECT_CHANGELOG.md](file:///Users/apple/Desktop/FraudRadar-v2/docs/PROJECT_CHANGELOG.md): Historical record of commits, architectural refactors, bug fixes, and resolved regressions.
 6. [docs/EXTERNAL_REVIEW_QUESTIONS_AND_ANSWERS.md](file:///Users/apple/Desktop/FraudRadar-v2/docs/EXTERNAL_REVIEW_QUESTIONS_AND_ANSWERS.md): 45 technically rigorous questions and answers prepared for academic and industry examiners.
 7. [docs/PROJECT_DEMO_SCRIPT.md](file:///Users/apple/Desktop/FraudRadar-v2/docs/PROJECT_DEMO_SCRIPT.md): Step-by-step 2-minute pitch, 5-minute technical walkthrough, and interactive demo sequence.
+

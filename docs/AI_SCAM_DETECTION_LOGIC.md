@@ -246,3 +246,4 @@ The following 5 examples demonstrate the actual output produced by FraudRadar-v2
 - **Category**: Phishing, Malicious Link, Prize Scam
 - **Engine Logic**: Flags high-abuse generic top-level domain (`.top`), deceptive path (`/spin-win`), unencrypted HTTP transport, and lottery lure keywords.
 - **Action Recommended**: Do not visit site; do not install APK files; report to Google Safe Browsing and PhishTank.
+

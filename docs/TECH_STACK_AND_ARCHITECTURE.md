@@ -250,3 +250,4 @@ CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON delivery_logs(timestamp);
 - **Container Base**: Alpine / Debian Linux container with Python 3.13 virtual environment.
 - **Reverse Proxy**: Internal Envoy / Fly Proxy handling SSL termination (TLS 1.3) and forwarding to Granian on port 8080.
 - **Health Checks**: Automated HTTP health check pinging `/ping` on port 8080.
+

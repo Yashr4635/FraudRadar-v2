@@ -155,3 +155,4 @@ To communicate uncertainty responsibly and avoid giving users a false sense of a
 1. **Direct Application Verification**: Never click links inside SMS; open the verified app (e.g., YONO SBI, Amazon, MyJio) directly from your phone's app launcher.
 2. **National Cybercrime Helpline**: Call **1930** immediately if any financial loss or unauthorized debit occurred.
 3. **Official Portals**: Report unverified SMS numbers to Telecom Scam Registry (**Chakshu** at [sancharsaathi.gov.in](https://sancharsaathi.gov.in)) and formal complaints at [cybercrime.gov.in](https://cybercrime.gov.in).
+

@@ -149,3 +149,4 @@ OK
 | `GET /settings` | 200 OK | 0.51s | **PASS** |
 | `GET /assistant` | 200 OK | 0.51s | **PASS** |
 | `GET /profile` | 200 OK | 0.50s | **PASS** |
+

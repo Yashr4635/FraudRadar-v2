@@ -161,3 +161,4 @@
 1. **On-Device Offline Small Language Model (SLM)**: Quantized 3B model (e.g. Llama-3.2-3B via ONNX/WebAssembly) for zero-latency offline client-side scanning.
 2. **Direct Chakshu / DLT API Integration**: Real-time validation against the Department of Telecommunications telemarketer registry to verify sender headers instantly.
 3. **Automated WhatsApp Scam Bot**: Direct webhook integration allowing citizens to forward suspicious messages directly to a verified WhatsApp business number for automated scanning.
+

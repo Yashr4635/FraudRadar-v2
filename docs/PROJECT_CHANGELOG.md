@@ -80,3 +80,4 @@
 2. **External Threat API Key Dependencies**:
    - Google Safe Browsing, VirusTotal, and PhishTank require active external API keys in `.env`.
    - If keys are missing, the system gracefully falls back to deterministic heuristic and Groq LLM scoring without throwing errors.
+

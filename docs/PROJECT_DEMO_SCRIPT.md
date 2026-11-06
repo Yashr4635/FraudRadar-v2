@@ -131,3 +131,4 @@ http://free-gift-claim.top/spin-win
 - **What if an examiner asks: "Where is your dataset?"**
   Answer honestly and professionally:
   *"We do not claim to have trained a proprietary neural network. We use an API-driven hybrid architecture leveraging Groq's open-weights Qwen 3.8 27B model, combined with an internal deterministic expert rule engine and threat APIs. Our benchmark suite evaluates detection against 7 canonical synthetic scam vectors with 100% precision on those classes."*
+
