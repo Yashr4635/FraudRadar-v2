@@ -2752,9 +2752,37 @@ def scam_guide_page() -> rx.Component:
 
 def legal_content() -> rx.Component:
     return rx.el.div(
+        # Dedicated Navigation Quick-Links
+        rx.el.div(
+            rx.el.div(
+                rx.el.div(
+                    rx.icon("file-text", class_name="h-6 w-6 text-[#E8471A] mb-2"),
+                    rx.el.h3("Terms of Service", class_name="text-lg font-bold text-gray-900"),
+                    rx.el.p("User agreement, acceptable use policy, OTP security rules, and educational disclaimers.", class_name="text-xs text-gray-600 mt-1 mb-4 leading-relaxed"),
+                    rx.el.a(
+                        "Read Full Terms →",
+                        href="/terms",
+                        class_name="inline-flex items-center text-xs font-bold text-[#E8471A] hover:text-[#c43a13] hover:underline",
+                    ),
+                    class_name="p-5 rounded-2xl bg-white border border-gray-200/80 shadow-xs flex-1 flex flex-col justify-between",
+                ),
+                rx.el.div(
+                    rx.icon("shield-check", class_name="h-6 w-6 text-emerald-600 mb-2"),
+                    rx.el.h3("Privacy Policy", class_name="text-lg font-bold text-gray-900"),
+                    rx.el.p("Data minimization, cryptographic encryption, and user rights under DPDP Act 2023.", class_name="text-xs text-gray-600 mt-1 mb-4 leading-relaxed"),
+                    rx.el.a(
+                        "Read Full Policy →",
+                        href="/privacy",
+                        class_name="inline-flex items-center text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline",
+                    ),
+                    class_name="p-5 rounded-2xl bg-white border border-gray-200/80 shadow-xs flex-1 flex flex-col justify-between",
+                ),
+                class_name="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6",
+            ),
+        ),
         card(
             rx.el.h3(
-                "Privacy & Trust",
+                "Privacy & Trust Commitment",
                 class_name="text-base font-semibold text-gray-900 mb-2",
             ),
             rx.el.p(
@@ -2764,7 +2792,7 @@ def legal_content() -> rx.Component:
         ),
         card(
             rx.el.h3(
-                "Terms of Service",
+                "Terms of Service & Scope",
                 class_name="text-base font-semibold text-gray-900 mb-2",
             ),
             rx.el.p(
@@ -2775,7 +2803,7 @@ def legal_content() -> rx.Component:
         ),
         card(
             rx.el.h3(
-                "Compliance",
+                "Statutory Compliance",
                 class_name="text-base font-semibold text-gray-900 mb-2",
             ),
             rx.el.ul(
@@ -2784,15 +2812,15 @@ def legal_content() -> rx.Component:
                     class_name="text-sm text-gray-700",
                 ),
                 rx.el.li(
-                    "Encryption in transit (TLS 1.2+).",
+                    "Encryption in transit (TLS 1.3).",
                     class_name="text-sm text-gray-700",
                 ),
                 rx.el.li(
-                    "Authentication via secure password hashing.",
+                    "Authentication via secure salted cryptographic password & OTP hashing.",
                     class_name="text-sm text-gray-700",
                 ),
                 rx.el.li(
-                    "No third-party ad tracking.",
+                    "No third-party ad tracking or commercial surveillance.",
                     class_name="text-sm text-gray-700",
                 ),
                 class_name="space-y-1 list-disc pl-5",
@@ -2801,11 +2829,11 @@ def legal_content() -> rx.Component:
         ),
         card(
             rx.el.h3(
-                "Disclaimer",
+                "National Emergency Helplines",
                 class_name="text-base font-semibold text-gray-900 mb-2",
             ),
             rx.el.p(
-                "Use FraudRadar as a supportive tool. For confirmed fraud, immediately call 1930 or report at cybercrime.gov.in. FraudRadar is not affiliated with any government agency.",
+                "Use FraudRadar as a supportive awareness tool. For confirmed cyber financial fraud, immediately call 1930 or lodge an official report at cybercrime.gov.in. FraudRadar is not affiliated with any government agency.",
                 class_name="text-sm text-gray-700 leading-relaxed",
             ),
             class_name="mt-4",

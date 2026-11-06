@@ -330,6 +330,34 @@ Helpline: 1930 | https://cybercrime.gov.in
         masked_rec = mask_email(clean_recipient)
         from_email, from_name = cls.get_sender_identity()
 
+        # ── 0. Dev Mode Outbox (ONLY when explicitly enabled or running tests) ──
+        if cls.is_dev_mode():
+            logger.warning(
+                f"[EMAIL_DEV_OUTBOX] Dispatched to outbox for {masked_rec} (Purpose: {purpose}, Subject: {subject})"
+            )
+            item = {
+                "recipient": clean_recipient,
+                "masked_recipient": masked_rec,
+                "subject": subject,
+                "html_content": html_content,
+                "text_content": text_content,
+                "purpose": purpose,
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            }
+            cls._outbox.append(item)
+            auth_db.log_delivery(
+                recipient=masked_rec,
+                purpose=purpose,
+                status="DEV_OUTBOX",
+                provider="mock_outbox",
+                error_message="",
+            )
+            return EmailDeliveryResult(
+                success=True,
+                message="Verification email dispatched (Demo Outbox).",
+                provider="mock_outbox",
+            )
+
         # ── 1. Check if SMTP is configured ──────────────────────────────────
         smtp_host = os.getenv("SMTP_HOST", "").strip()
         smtp_user = os.getenv("SMTP_USER", "").strip()
@@ -392,35 +420,7 @@ Helpline: 1930 | https://cybercrime.gov.in
                 sendgrid_key,
             )
 
-        # ── 5. Dev Mode Outbox (ONLY when explicitly enabled or running tests) ──
-        if cls.is_dev_mode():
-            logger.warning(
-                f"[EMAIL_DEV_OUTBOX] Dispatched to outbox for {masked_rec} (Purpose: {purpose}, Subject: {subject})"
-            )
-            item = {
-                "recipient": clean_recipient,
-                "masked_recipient": masked_rec,
-                "subject": subject,
-                "html_content": html_content,
-                "text_content": text_content,
-                "purpose": purpose,
-                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            }
-            cls._outbox.append(item)
-            auth_db.log_delivery(
-                recipient=masked_rec,
-                purpose=purpose,
-                status="DEV_OUTBOX",
-                provider="mock_outbox",
-                error_message="",
-            )
-            return EmailDeliveryResult(
-                success=True,
-                message="Verification email dispatched (Demo Outbox).",
-                provider="mock_outbox",
-            )
-
-        # ── 6. Production Error: No provider configured ─────────────────────
+        # ── 4. Production Error: No provider configured ─────────────────────
         err_msg = (
             "Email service is not configured. Please set SMTP credentials "
             "(SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD) in production."

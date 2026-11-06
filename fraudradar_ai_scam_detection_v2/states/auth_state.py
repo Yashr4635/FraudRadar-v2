@@ -637,7 +637,11 @@ class AuthState(rx.State):
                 self.otp_code = ""
                 self.auth_success = msg
                 return AuthState.start_resend_countdown
-            # If custom SMTP failed, log and fall through to Supabase GoTrue
+            else:
+                self.otp_loading = False
+                self.auth_error = msg
+                self.show_otp_view = False
+                return
 
         # Fallback: Restore previously working Supabase GoTrue OTP delivery
         sb = get_supabase()
@@ -805,6 +809,10 @@ class AuthState(rx.State):
                 self.otp_loading = False
                 self.auth_success = f"A new verification code has been sent to {masked}."
                 return AuthState.start_resend_countdown
+            else:
+                self.otp_loading = False
+                self.otp_error = msg
+                return
 
         # Fallback to Supabase GoTrue resend
         sb = get_supabase()

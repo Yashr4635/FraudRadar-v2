@@ -88,6 +88,16 @@ class TestLiveAppPages(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         print(f"  ✅ Legal page loaded in {elapsed:.2f}s")
 
+    def test_07a_terms_page_loads(self):
+        resp, elapsed = self._get_page("/terms")
+        self.assertEqual(resp.status_code, 200)
+        print(f"  ✅ Dedicated Terms of Service page loaded in {elapsed:.2f}s")
+
+    def test_07b_privacy_page_loads(self):
+        resp, elapsed = self._get_page("/privacy")
+        self.assertEqual(resp.status_code, 200)
+        print(f"  ✅ Dedicated Privacy Policy page loaded in {elapsed:.2f}s")
+
     # ── Dashboard / History / Settings (may redirect to login) ────────────
 
     def test_08_dashboard_responds(self):

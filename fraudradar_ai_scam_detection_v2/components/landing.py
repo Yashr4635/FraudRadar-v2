@@ -627,25 +627,27 @@ def landing_footer() -> rx.Component:
             ),
             rx.el.div(
                 rx.el.p(
-                    "Resources",
+                    "Legal & Trust",
                     class_name="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3",
                 ),
                 rx.el.a(
+                    "Terms of Service",
+                    href="/terms",
+                    class_name="block text-sm text-gray-600 hover:text-orange-500 py-1",
+                ),
+                rx.el.a(
                     "Privacy Policy",
+                    href="/privacy",
+                    class_name="block text-sm text-gray-600 hover:text-orange-500 py-1",
+                ),
+                rx.el.a(
+                    "Compliance & Helplines",
                     href="/legal",
                     class_name="block text-sm text-gray-600 hover:text-orange-500 py-1",
                 ),
                 rx.el.a(
                     "Contact",
-                    href="mailto:hello@fraudradar.app",
-                    class_name="block text-sm text-gray-600 hover:text-orange-500 py-1",
-                ),
-                rx.el.a(
-                    rx.el.span(
-                        "GitHub", class_name="inline-flex items-center gap-1"
-                    ),
-                    href="https://github.com",
-                    target="_blank",
+                    href="mailto:support@fraudradar.app",
                     class_name="block text-sm text-gray-600 hover:text-orange-500 py-1",
                 ),
             ),

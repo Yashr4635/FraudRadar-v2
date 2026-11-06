@@ -18,6 +18,10 @@ from fraudradar_ai_scam_detection_v2.components.pages import (
     scam_guide_page,
     legal_page,
 )
+from fraudradar_ai_scam_detection_v2.components.legal_pages import (
+    dedicated_terms_page,
+    dedicated_privacy_page,
+)
 
 
 def index() -> rx.Component:
@@ -137,3 +141,7 @@ app.add_page(settings_page, route="/settings")
 app.add_page(helpline_page, route="/helpline")
 app.add_page(scam_guide_page, route="/scam-guide")
 app.add_page(legal_page, route="/legal")
+app.add_page(dedicated_terms_page, route="/terms", title="FraudRadar | Terms of Service")
+app.add_page(dedicated_terms_page, route="/terms-of-service", title="FraudRadar | Terms of Service")
+app.add_page(dedicated_privacy_page, route="/privacy", title="FraudRadar | Privacy Policy")
+app.add_page(dedicated_privacy_page, route="/privacy-policy", title="FraudRadar | Privacy Policy")
