@@ -269,5 +269,25 @@ class TestUnifiedOtpAuthentication(unittest.TestCase):
         self.assertEqual(self.state.access_token, "")
 
 
+    def test_expired_otp_rejected(self):
+        """Expired OTP is rejected and invalidated."""
+        email = "expired_otp@example.com"
+        # Store OTP with -10 second negative expiration (already expired)
+        auth_db.store_otp(email, "login", "77777777", expires_in_seconds=-10)
+        ok, msg = auth_db.verify_and_consume_otp(email, "login", "77777777")
+        self.assertFalse(ok)
+        self.assertIn("expired", msg.lower())
+
+    def test_otp_rate_limiting(self):
+        """More than 5 requests in 15 minutes triggers rate limiting."""
+        email = "rate_limit_test@example.com"
+        for _ in range(5):
+            auth_db.store_otp(email, "login", "12345678")
+
+        allowed, msg = auth_db.check_rate_limit(email, "login", window_seconds=900, max_requests=5)
+        self.assertFalse(allowed)
+        self.assertIn("too many", msg.lower())
+
+
 if __name__ == "__main__":
     unittest.main()
