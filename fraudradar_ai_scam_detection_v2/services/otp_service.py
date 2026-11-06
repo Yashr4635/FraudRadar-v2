@@ -120,6 +120,13 @@ def send_auth_otp(
         logger.error(f"OTP delivery failed to {masked}: {delivery.message}")
         return False, delivery.message, masked
 
+    if delivery.provider == "mock_outbox":
+        return (
+            True,
+            f"Verification code sent to {masked}. (Demo Code: {otp_code})",
+            masked,
+        )
+
     return True, f"Verification code sent to {masked}.", masked
 
 

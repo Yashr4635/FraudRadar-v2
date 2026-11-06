@@ -893,7 +893,7 @@ class AuthState(rx.State):
         self.otp_type = "signup"
         self.show_otp_view = True
         self.otp_code = ""
-        self.auth_success = f"Account registered! We've sent an 8-digit verification code to {masked}."
+        self.auth_success = f"Account registered! {msg}"
         return AuthState.start_resend_countdown
 
     @rx.event
